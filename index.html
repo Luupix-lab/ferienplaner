@@ -794,9 +794,13 @@ document.addEventListener('click', async ev => {
     case 'plReq': S.sel = null; S.plReq = id; render(); $('sheet').classList.add('open'); document.body.classList.add('sheet-open'); break;
     case 'status': await rpc('admin_set_status', { p_id: id, p_status: t.dataset.s }); break;
     case 'adminDel': if (confirm('Endgültig löschen?')) await rpc('admin_delete_request', { p_id: id }); break;
-    case 'saveLimits':
-      for (const c of CATS) await rpc('admin_set_limit', { p_category: c, p_max: Math.max(1, Number($('lim-' + c).value) || 1) });
-      toast('Limits gespeichert'); break;
+    case 'saveLimits': {
+      // Werte zuerst auslesen: jedes rpc() lädt neu und rendert die Felder mit den alten DB-Werten
+      const vals = CATS.map(c => [c, Math.max(1, Number($('lim-' + c).value) || 1)]);
+      let ok = true;
+      for (const [c, max] of vals) if (!(ok = await rpc('admin_set_limit', { p_category: c, p_max: max }))) break;
+      if (ok) toast('Limits gespeichert');
+      break; }
     case 'saveEmp':
       if (await rpc('admin_save_employee', { p_id: id, p_name: $('en-' + id).value, p_category: $('ec-' + id).value, p_active: $('ea-' + id).value === '1',
         p_days: $('ed-' + id).value === '' ? null : Number($('ed-' + id).value),
