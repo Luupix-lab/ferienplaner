@@ -148,6 +148,12 @@ nav button.on{color:var(--ink);font-weight:600}
   box-shadow:0 6px 20px rgba(0,0,0,.2);transition:opacity .2s}
 .empty{text-align:center;color:var(--muted);padding:24px 8px}
 
+.mgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:4px}
+.mgrid label{font-size:11px;color:var(--muted);text-align:center}
+.mgrid input{padding:8px 2px;text-align:center;min-height:40px}
+.mgrid input::placeholder{color:var(--muted);opacity:.4}
+.mgrid input:not(:placeholder-shown){font-weight:700;color:var(--selInk);border-color:var(--selInk);background:var(--sel)}
+
 /* Admin-Planer */
 body.wide main{max-width:none}
 .pl-wrap{overflow:auto;max-height:calc(100vh - 230px);border:1px solid var(--line);border-radius:12px;background:var(--card);-webkit-overflow-scrolling:touch}
@@ -209,6 +215,7 @@ const SUPABASE_KEY = 'sb_publishable_TL3V4k0W-FiZVg2gZK5qOA_P_q1_Shf';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const CATS = ['Clinic', 'Verkauf'];
+const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
 const S = {
   employees: [], limits: {}, requests: [], blocks: [], blockMode: false,
   me: Number(localStorage.getItem('fp_me')) || null,
@@ -311,6 +318,8 @@ const KINDS = { ferien: { label: 'Ferien', chip: '🌴 Ferien', cls: '' }, pruef
 function kindsFor(e) { return e?.hourly ? ['pruefung', 'ferien', 'wk'] : ['ferien', 'wk']; }
 function curKind(e) { const ks = kindsFor(e); return ks.includes(S.kind) ? S.kind : ks[0]; }
 function kindCls(r) { return KINDS[r.kind]?.cls || ''; }
+// Limit an einem Tag: Monats-Ausnahme (gilt jedes Jahr) oder Standard
+function limitFor(cat, ds) { return S.monthLimits?.[cat]?.[+ds.slice(5, 7)] ?? (S.limits[cat] || 1); }
 // Zum Limit zählen nur Ferien von Festangestellten
 function limited(r) { return r.kind === 'ferien' && !emp(r.employee_id)?.hourly; }
 function dayLabel(r) { return emp(r.employee_id)?.hourly || r.kind !== 'ferien' ? `${workDays(r.start_date, r.end_date)} Arbeitstage` : fmtD(wd(r)) + ' Ferientage'; }
@@ -324,17 +333,20 @@ function statusTag(r) {
 
 /* ---------- Daten ---------- */
 async function load(quiet) {
-  const [e, l, r, b] = await Promise.all([
+  const [e, l, r, b, ml] = await Promise.all([
     db.from('employees').select('*').order('name'),
     db.from('category_limits').select('*'),
     db.from('requests').select('*').order('start_date'),
     db.from('blocked_days').select('*').order('start_date'),
+    db.from('month_limits').select('*'),
   ]);
   if (e.error || l.error || r.error) { toast('Fehler beim Laden – Internet prüfen'); return; }
   S.employees = e.data;
   S.limits = Object.fromEntries(l.data.map(x => [x.category, x.max_parallel]));
   S.requests = r.data;
   S.blocks = b.data || [];
+  S.monthLimits = {};
+  for (const x of ml.data || []) (S.monthLimits[x.category] ||= {})[x.month] = x.max_parallel;
   if (S.me && !emp(S.me)) { S.me = null; localStorage.removeItem('fp_me'); }
   computeConflicts();
   render(quiet);
@@ -362,7 +374,7 @@ function computeConflicts() {
     }
   }
   for (const [k, list] of perCat) {
-    const lim = S.limits[k.split('|')[1]] || 1;
+    const [day, cat] = k.split('|'), lim = limitFor(cat, day);
     if (list.length <= lim) continue;
     list.sort(rank);
     const ahead = list.slice(0, lim);
@@ -437,7 +449,7 @@ function renderCal() {
       const hol = holiday(ds);
       const cls = ['day',
         d.getMonth() !== m.getMonth() && 'out', i > 4 && 'we', hol && 'hol-' + hol.type, ds === today() && 'today',
-        sameCatOthers >= lim && 'full', blocked && 'blocked',
+        sameCatOthers >= (lim === Infinity ? lim : limitFor(me.category, ds)) && 'full', blocked && 'blocked',
         (S.dayMap.get(ds) || []).some(r => r.employee_id === S.me) && 'mine',
         S.sel && ds >= S.sel.start && ds <= S.sel.end && 'sel'].filter(Boolean).join(' ');
       const dots = list.slice(0, 6).map(r => `<span class="dot ${emp(r.employee_id).category} ${r.status}${kindCls(r)}"></span>`).join('');
@@ -551,8 +563,12 @@ function renderAdminRest(done, card) {
       : '<p class="small muted" style="margin-top:12px">Keine Sperrtage geplant.</p>'}
   </div>`;
   h += `<h2>Limit gleichzeitig abwesend</h2><div class="card"><div class="row">` + CATS.map(c =>
-    `<div><label class="f">${c}</label><input type="number" min="1" max="20" id="lim-${c}" value="${S.limits[c] || 1}"></div>`).join('') +
-    `</div><div class="actions"><button class="btn sm primary" data-action="saveLimits">Speichern</button></div></div>`;
+    `<div><label class="f">${c} (Standard)</label><input type="number" min="1" max="20" id="lim-${c}" value="${S.limits[c] || 1}"></div>`).join('') +
+    `</div><p class="small muted" style="margin:14px 0 4px">Abweichend pro Monat – gilt jedes Jahr, leer = Standard:</p>` +
+    CATS.map(c => `<label class="f" style="margin-top:10px">${c}</label><div class="mgrid">${MONTHS.map((mn, i) =>
+      `<div><label for="ml-${c}-${i + 1}" style="display:block">${mn}</label><input type="number" min="1" max="20" inputmode="numeric" id="ml-${c}-${i + 1}"
+        value="${S.monthLimits?.[c]?.[i + 1] ?? ''}" placeholder="${S.limits[c] || 1}"></div>`).join('')}</div>`).join('') +
+    `<div class="actions"><button class="btn sm primary" data-action="saveLimits">Speichern</button></div></div>`;
   h += `<h2>Mitarbeiter (${S.employees.length})</h2><div class="card"><label class="f">Neue Mitarbeiter – ein Name pro Zeile</label>
       <textarea id="newNames" rows="4" placeholder="Anna Muster&#10;Ben Beispiel"></textarea>
       <div class="row" style="margin-top:8px"><select id="newCat">${CATS.map(c => `<option ${c === S.lastCat ? 'selected' : ''}>${c}</option>`).join('')}</select>
@@ -616,7 +632,7 @@ function plMonth(admin) {
   let h = `<table class="pl"><thead><tr><th class="nm"></th>${dates.map(ds => { const hol = holiday(ds);
     return `<th class="${dayCls(ds)}" title="${hol ? hol.name : ''}"><span>${fmt(ds, { weekday: 'short' }).slice(0, 2)}</span>${+ds.slice(8)}</th>`; }).join('')}</tr></thead><tbody>`;
   for (const cat of CATS) {
-    const lim = S.limits[cat] || 1;
+    const lim = limitFor(cat, dates[0]);
     h += `<tr class="grp"><th class="nm">${cat} <small>max ${lim}</small></th>${dates.map(ds => { const n = countOn(ds, cat);
       return `<td class="${n > lim ? 'over' : n && n === lim ? 'at' : ''}">${n || ''}</td>`; }).join('')}</tr>`;
     for (const e of plEmployees(cat)) {
@@ -640,10 +656,11 @@ function plYear(y, admin) {
     `<th colspan="${x.n}">${parse(x.m + '-01').toLocaleDateString('de-CH', { month: 'short' })}</th>`).join('')}${admin ? '<th></th>' : ''}</tr>
     <tr><th class="nm"></th>${weeks.map(mon => `<th class="${today() >= mon && today() <= addDays(mon, 6) ? 'tod' : ''}" title="${fmtRange(mon, addDays(mon, 6))}">${isoWeek(parse(mon))}</th>`).join('')}${admin ? '<th>Total</th>' : ''}</tr></thead><tbody>`;
   for (const cat of CATS) {
-    const lim = S.limits[cat] || 1;
-    h += `<tr class="grp"><th class="nm">${cat} <small>max ${lim}</small></th>${weeks.map(mon => {
-      let n = 0; for (let i = 0; i < 7; i++) n = Math.max(n, countOn(addDays(mon, i), cat));
-      return `<td class="${n > lim ? 'over' : n && n === lim ? 'at' : ''}">${n || ''}</td>`; }).join('')}${admin ? '<td></td>' : ''}</tr>`;
+    const varies = Object.keys(S.monthLimits?.[cat] || {}).length > 0;
+    h += `<tr class="grp"><th class="nm" ${varies ? 'title="* je nach Monat anders"' : ''}>${cat} <small>max ${S.limits[cat] || 1}${varies ? '*' : ''}</small></th>${weeks.map(mon => {
+      let n = 0, over = false, at = false;
+      for (let i = 0; i < 7; i++) { const ds = addDays(mon, i), c = countOn(ds, cat), l = limitFor(cat, ds); n = Math.max(n, c); over ||= c > l; at ||= c > 0 && c === l; }
+      return `<td class="${over ? 'over' : at ? 'at' : ''}">${n || ''}</td>`; }).join('')}${admin ? '<td></td>' : ''}</tr>`;
     for (const e of plEmployees(cat)) {
       const b = balance(e.id, y);
       h += `<tr>${plName(e, admin)}${weeks.map(mon => {
@@ -685,11 +702,10 @@ function renderSheet() {
   const hourly = !!me.hourly, kind = curKind(me), isFerien = kind === 'ferien';
   const blockedHit = isFerien ? blocksFor(me.category).filter(b => overlaps(b, start, end)) : [];
   const year = start.slice(0, 4);
-  const lim = S.limits[me.category] || 1;
   const away = S.requests.filter(r => r.status !== 'abgelehnt' && r.employee_id !== S.me && overlaps(r, start, end));
   let fullDays = 0;
   for (let d = start; d <= end; d = addDays(d, 1))
-    if (!hourly && isFerien && (S.dayMap.get(d) || []).filter(r => r.employee_id !== S.me && emp(r.employee_id).category === me.category && limited(r)).length >= lim) fullDays++;
+    if (!hourly && isFerien && (S.dayMap.get(d) || []).filter(r => r.employee_id !== S.me && emp(r.employee_id).category === me.category && limited(r)).length >= limitFor(me.category, d)) fullDays++;
   const prioUsed = S.requests.find(r => r.employee_id === S.me && r.is_prio && r.status !== 'abgelehnt' && r.start_date.startsWith(year));
   const prioOk = !prioUsed && n <= 7;
   const prioHint = prioUsed ? `Deine Prio-Woche ${year} ist schon vergeben (KW ${isoWeek(parse(prioUsed.start_date))}).`
@@ -715,7 +731,7 @@ function renderSheet() {
       const after = Math.round((b.left - ft(daysInYear(start, end, y), S.me)) * 10) / 10;
       return after < 0 ? `<div class="warn">⚠️ Damit überziehst du dein Guthaben ${y} um <b>${fmtD(-after)} Tag${after === -1 ? '' : 'e'}</b> (${fmtD(b.total)} Tage/Jahr). Senden geht trotzdem – der Admin entscheidet.</div>`
         : `<p class="small muted" style="margin:10px 0 0">Danach übrig ${y}: <b>${fmtD(after)}</b> von ${fmtD(b.total)} Ferientagen</p>`; }).join('')}
-    ${fullDays ? `<div class="warn">⚠️ An ${fullDays} Tag${fullDays > 1 ? 'en' : ''} sind schon ${lim} von ${me.category} weg (Limit ${lim}). ${prioOk ? 'Mit der Prio-Woche hast du Vorrang vor normalen Wünschen.' : 'Dein Wunsch kommt auf die Warteliste.'}</div>` : ''}
+    ${fullDays ? `<div class="warn">⚠️ An ${fullDays} Tag${fullDays > 1 ? 'en' : ''} ist das Limit für ${me.category} schon erreicht. ${prioOk ? 'Mit der Prio-Woche hast du Vorrang vor normalen Wünschen.' : 'Dein Wunsch kommt auf die Warteliste.'}</div>` : ''}
     ${hourly || !isFerien ? '' : `<label class="prio-box"><input type="checkbox" id="prio" ${prioOk ? '' : 'disabled'} ${prioOk && prev ? 'checked' : ''}>
       <span><b>Als Prio-Woche markieren</b><br><span class="small muted">${prioHint}</span></span></label>`}
     <input type="text" id="fNote" placeholder="Bemerkung (optional)" maxlength="200" value="${esc(prevNote)}">
@@ -835,9 +851,18 @@ document.addEventListener('click', async ev => {
     case 'saveLimits': {
       // Werte zuerst auslesen: jedes rpc() lädt neu und rendert die Felder mit den alten DB-Werten
       const vals = CATS.map(c => [c, Math.max(1, Number($('lim-' + c).value) || 1)]);
-      let ok = true;
-      for (const [c, max] of vals) if (!(ok = await rpc('admin_set_limit', { p_category: c, p_max: max }))) break;
-      if (ok) toast('Limits gespeichert');
+      const months = [];   // nur geänderte Monate speichern
+      for (const c of CATS) for (let m = 1; m <= 12; m++) {
+        const v = $(`ml-${c}-${m}`).value, next = v === '' ? null : Math.max(1, Number(v) || 1);
+        if (next !== (S.monthLimits?.[c]?.[m] ?? null)) months.push([c, m, next]);
+      }
+      const calls = [...vals.map(([c, max]) => ['admin_set_limit', { p_category: c, p_max: max }]),
+        ...months.map(([c, m, max]) => ['admin_set_month_limit', { p_category: c, p_month: m, p_max: max }])];
+      for (const [fn, args] of calls) {
+        const { error } = await db.rpc(fn, { p_pin: S.pin, ...args });
+        if (error) { await load(); return toast(error.message.includes('PIN') ? 'PIN ungültig – bitte neu anmelden' : 'Fehler: ' + error.message); }
+      }
+      await load(); toast('Limits gespeichert');
       break; }
     case 'saveEmp':
       if (await rpc('admin_save_employee', { p_id: id, p_name: $('en-' + id).value, p_category: $('ec-' + id).value, p_active: $('ea-' + id).value === '1',
