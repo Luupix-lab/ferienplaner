@@ -160,7 +160,7 @@ const S = {
   tab: 'cal', filter: 'Alle', teamFilter: 'Alle',
   month: firstOfMonth(new Date()),
   sel: null,                        // {start, end}
-  pin: sessionStorage.getItem('fp_pin') || null,
+  pin: localStorage.getItem('fp_pin') || null,
   dayMap: new Map(), conflicts: new Map(),
 };
 
@@ -205,7 +205,7 @@ function statusTag(r) {
 }
 
 /* ---------- Daten ---------- */
-async function load() {
+async function load(quiet) {
   const [e, l, r] = await Promise.all([
     db.from('employees').select('*').order('name'),
     db.from('category_limits').select('*'),
@@ -217,7 +217,7 @@ async function load() {
   S.requests = r.data;
   if (S.me && !emp(S.me)) { S.me = null; localStorage.removeItem('fp_me'); }
   computeConflicts();
-  render();
+  render(quiet);
 }
 
 // Rangfolge pro Tag & Kategorie: Prio vor normal, dann genehmigt vor offen, dann wer zuerst eingetragen hat
@@ -263,7 +263,7 @@ function conflictText(r) {
 }
 
 /* ---------- Render ---------- */
-function render() {
+function render(quiet) {
   const me = emp(S.me);
   $('meBtn').classList.toggle('hidden', !me);
   $('nav').classList.toggle('hidden', !me);
@@ -271,8 +271,13 @@ function render() {
   const open = S.requests.filter(r => r.status === 'offen').length;
   $('adminBadge').textContent = open; $('adminBadge').classList.toggle('hidden', !open || !S.pin);
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === S.tab));
-  if (!me) { closeSheet(); $('main').innerHTML = renderWho(); return; }
-  $('main').innerHTML = { cal: renderCal, mine: renderMine, team: renderTeam, admin: renderAdmin }[S.tab]();
+  if (!me && S.tab !== 'admin') { closeSheet(); $('main').innerHTML = renderWho(); return; }
+  const typing = document.activeElement?.closest?.('#main') && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+  if (quiet && typing) return;   // Live-Update nicht mitten ins Tippen rendern
+  const draft = $('newNames')?.value;
+  $('main').innerHTML = (me ? '' : '<button class="btn sm" style="margin-top:4px" data-action="backToWho">‹ Zur Namensauswahl</button>')
+    + { cal: renderCal, mine: renderMine, team: renderTeam, admin: renderAdmin }[S.tab]();
+  if (draft && $('newNames')) $('newNames').value = draft;
   if (S.sel) renderSheet();
 }
 
@@ -383,14 +388,15 @@ function renderAdmin() {
   h += `<h2>Limit gleichzeitig abwesend</h2><div class="card"><div class="row">` + CATS.map(c =>
     `<div><label class="f">${c}</label><input type="number" min="1" max="20" id="lim-${c}" value="${S.limits[c] || 1}"></div>`).join('') +
     `</div><div class="actions"><button class="btn sm primary" data-action="saveLimits">Speichern</button></div></div>`;
-  h += `<h2>Mitarbeiter</h2><div class="card">` + S.employees.map(e => `<div class="row" style="margin-bottom:8px">
-      <input type="text" id="en-${e.id}" value="${esc(e.name)}" style="flex:2">
+  h += `<h2>Mitarbeiter (${S.employees.length})</h2><div class="card"><label class="f">Neue Mitarbeiter – ein Name pro Zeile</label>
+      <textarea id="newNames" rows="4" placeholder="Anna Muster&#10;Ben Beispiel"></textarea>
+      <div class="row" style="margin-top:8px"><select id="newCat">${CATS.map(c => `<option ${c === S.lastCat ? 'selected' : ''}>${c}</option>`).join('')}</select>
+      <button class="btn sm primary" data-action="addEmp">Hinzufügen</button></div></div>
+    <div class="card">` + S.employees.map(e => `<div class="row" style="flex-wrap:wrap;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line)">
+      <input type="text" id="en-${e.id}" value="${esc(e.name)}" style="flex:1 1 100%">
       <select id="ec-${e.id}">${CATS.map(c => `<option ${c === e.category ? 'selected' : ''}>${c}</option>`).join('')}</select>
-      <select id="ea-${e.id}" style="flex:.9"><option value="1" ${e.active ? 'selected' : ''}>aktiv</option><option value="0" ${e.active ? '' : 'selected'}>inaktiv</option></select>
-      <button class="btn sm" style="flex:none" data-action="saveEmp" data-id="${e.id}">✓</button></div>`).join('') +
-    `<div class="row" style="margin-top:12px"><input type="text" id="newName" placeholder="Neuer Name" style="flex:2">
-      <select id="newCat">${CATS.map(c => `<option>${c}</option>`).join('')}</select>
-      <button class="btn sm primary" style="flex:none" data-action="addEmp">+</button></div></div>`;
+      <select id="ea-${e.id}"><option value="1" ${e.active ? 'selected' : ''}>aktiv</option><option value="0" ${e.active ? '' : 'selected'}>inaktiv</option></select>
+      <button class="btn sm" style="flex:none" data-action="saveEmp" data-id="${e.id}">Speichern</button></div>`).join('') + `</div>`;
   h += `<h2>Bearbeitet (zukünftig)</h2>` + (done.length ? done.map(card).join('') : '<div class="card empty">–</div>');
   h += `<h2>Einstellungen</h2><div class="card"><label class="f">Neue Admin-PIN</label>
     <div class="row"><input type="password" inputmode="numeric" id="newPin" autocomplete="new-password"><button class="btn sm" style="flex:none" data-action="changePin">Ändern</button></div>
@@ -450,7 +456,7 @@ async function submit() {
 async function rpc(fn, args) {
   const { error } = await db.rpc(fn, { p_pin: S.pin, ...args });
   if (error) { toast(error.message.includes('PIN') ? 'PIN ungültig – bitte neu anmelden' : 'Fehler: ' + error.message);
-    if (error.message.includes('PIN')) { S.pin = null; sessionStorage.removeItem('fp_pin'); render(); } return false; }
+    if (error.message.includes('PIN')) { S.pin = null; localStorage.removeItem('fp_pin'); render(); } return false; }
   await load(); return true;
 }
 
@@ -462,15 +468,8 @@ document.addEventListener('click', async ev => {
   switch (a) {
     case 'pick': S.me = id; localStorage.setItem('fp_me', id); S.tab = 'cal'; render(); break;
     case 'switch': if (confirm('Person wechseln?')) { S.me = null; localStorage.removeItem('fp_me'); render(); } break;
-    case 'adminFromWho': {
-      const pin = prompt('Admin-PIN'); if (!pin) break;
-      const { data } = await db.rpc('admin_login', { p_pin: pin });
-      if (!data) { toast('Falsche PIN'); break; }
-      S.pin = pin; sessionStorage.setItem('fp_pin', pin);
-      const name = prompt('Ersten Mitarbeiter anlegen – Name:'); if (!name) break;
-      const cat = confirm(`Ist ${name} in der Clinic?\nOK = Clinic, Abbrechen = Verkauf`) ? 'Clinic' : 'Verkauf';
-      if (await rpc('admin_save_employee', { p_id: null, p_name: name, p_category: cat, p_active: true })) toast('Angelegt – jetzt Namen wählen');
-      break; }
+    case 'adminFromWho': S.tab = 'admin'; render(); window.scrollTo(0, 0); break;
+    case 'backToWho': S.tab = 'cal'; render(); window.scrollTo(0, 0); break;
     case 'prev': S.month = new Date(S.month.getFullYear(), S.month.getMonth() - 1, 1); render(); break;
     case 'next': S.month = new Date(S.month.getFullYear(), S.month.getMonth() + 1, 1); render(); break;
     case 'filter': S.filter = t.dataset.f; render(); break;
@@ -492,8 +491,8 @@ document.addEventListener('click', async ev => {
     case 'login': {
       const pin = $('pinIn').value; const { data } = await db.rpc('admin_login', { p_pin: pin });
       if (!data) { toast('Falsche PIN'); break; }
-      S.pin = pin; sessionStorage.setItem('fp_pin', pin); render(); break; }
-    case 'logout': S.pin = null; sessionStorage.removeItem('fp_pin'); render(); break;
+      S.pin = pin; localStorage.setItem('fp_pin', pin); render(); break; }
+    case 'logout': S.pin = null; localStorage.removeItem('fp_pin'); render(); break;
     case 'status': await rpc('admin_set_status', { p_id: id, p_status: t.dataset.s }); break;
     case 'adminDel': if (confirm('Endgültig löschen?')) await rpc('admin_delete_request', { p_id: id }); break;
     case 'saveLimits':
@@ -503,13 +502,23 @@ document.addEventListener('click', async ev => {
       if (await rpc('admin_save_employee', { p_id: id, p_name: $('en-' + id).value, p_category: $('ec-' + id).value, p_active: $('ea-' + id).value === '1' })) toast('Gespeichert');
       break;
     case 'addEmp': {
-      const name = $('newName').value.trim(); if (!name) return toast('Name fehlt');
-      if (await rpc('admin_save_employee', { p_id: null, p_name: name, p_category: $('newCat').value, p_active: true })) toast(name + ' angelegt');
+      const names = [...new Set($('newNames').value.split('\n').map(n => n.trim()).filter(Boolean))];
+      if (!names.length) return toast('Bitte mindestens einen Namen eingeben');
+      S.lastCat = $('newCat').value;
+      const failed = [];
+      for (const name of names) {
+        const { error } = await db.rpc('admin_save_employee', { p_pin: S.pin, p_id: null, p_name: name, p_category: S.lastCat, p_active: true });
+        if (error?.message.includes('PIN')) { S.pin = null; localStorage.removeItem('fp_pin'); render(); return toast('PIN ungültig – bitte neu anmelden'); }
+        if (error) failed.push(name + (error.code === '23505' ? ' (gibt es schon)' : ''));
+      }
+      await load();
+      $('newNames').value = failed.map(f => f.replace(' (gibt es schon)', '')).join('\n');
+      toast(failed.length ? `Nicht angelegt: ${failed.join(', ')}` : `${names.length} × ${S.lastCat} angelegt ✓`);
       break; }
     case 'changePin': {
       const np = $('newPin').value; if (np.length < 4) return toast('Mind. 4 Zeichen');
       const { error } = await db.rpc('admin_change_pin', { p_pin: S.pin, p_new: np });
-      if (error) toast('Fehler: ' + error.message); else { S.pin = np; sessionStorage.setItem('fp_pin', np); toast('PIN geändert'); }
+      if (error) toast('Fehler: ' + error.message); else { S.pin = np; localStorage.setItem('fp_pin', np); toast('PIN geändert'); }
       break; }
   }
 });
@@ -524,9 +533,9 @@ document.addEventListener('change', ev => {
 /* ---------- Live-Updates ---------- */
 let reloadTimer;
 db.channel('live').on('postgres_changes', { event: '*', schema: 'public' }, () => {
-  clearTimeout(reloadTimer); reloadTimer = setTimeout(load, 300);
+  clearTimeout(reloadTimer); reloadTimer = setTimeout(() => load(true), 300);
 }).subscribe();
-document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) load(true); });
 
 load();
 </script>
