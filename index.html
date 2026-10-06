@@ -154,6 +154,15 @@ nav button.on{color:var(--ink);font-weight:600}
 .mgrid input::placeholder{color:var(--muted);opacity:.4}
 .mgrid input:not(:placeholder-shown){font-weight:700;color:var(--selInk);border-color:var(--selInk);background:var(--sel)}
 
+/* Admin: Umschaltleiste und Freigaben */
+.seg{display:flex;gap:2px;background:var(--line);border-radius:12px;padding:3px;margin:12px 0 4px}
+.seg button{flex:1;border:none;background:none;padding:9px 4px;border-radius:9px;font-size:14px;font-weight:600;color:var(--muted)}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.appr-row{border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
+.appr-row .actions{margin-top:8px}
+.conf{font-size:13px;color:var(--danger);margin-top:4px}
+.bal{font-size:13px;margin-top:2px}
+
 /* Admin-Planer */
 body.wide main{max-width:none}
 .pl-wrap{overflow:auto;max-height:calc(100vh - 230px);border:1px solid var(--line);border-radius:12px;background:var(--card);-webkit-overflow-scrolling:touch}
@@ -522,13 +531,51 @@ function renderAdmin() {
   if (!S.pin) return `<h2>Admin</h2><div class="card"><label class="f">Admin-PIN</label>
     <input type="password" inputmode="numeric" id="pinIn" autocomplete="off">
     <div class="actions"><button class="btn primary block" data-action="login">Anmelden</button></div></div>`;
-  const open = S.requests.filter(r => r.status === 'offen').sort(rank);
-  const done = S.requests.filter(r => r.status !== 'offen' && r.end_date >= today());
-  const card = adminCard;
-  if (S.adminView === 'planner') return renderPlanner();
-  let h = `<button class="btn primary block" style="margin-top:12px" data-action="planner">📊 Ferienplaner-Übersicht</button>`;
-  h += `<h2>Offene Wünsche (${open.length})</h2>` + (open.length ? open.map(card).join('') : '<div class="card empty">Alles erledigt 👍</div>');
-  return h + renderAdminRest(done, card);
+  const nOpen = S.requests.filter(r => r.status === 'offen').length, view = S.adminView || 'freigaben';
+  const nav = `<div class="seg">${[['freigaben', `Freigaben${nOpen ? ` (${nOpen})` : ''}`], ['planner', 'Planer'], ['settings', 'Einstellungen']].map(([v, l]) =>
+    `<button class="${view === v ? 'on' : ''}" data-action="adminView" data-v="${v}">${l}</button>`).join('')}</div>`;
+  if (view === 'planner') return nav + renderPlanner();
+  if (view === 'settings') return nav + renderAdminRest();
+  return nav + renderApprovals();
+}
+
+// Freigaben gruppiert nach Mitarbeiter (alphabetisch), Einträge nach Datum
+function renderApprovals() {
+  const f = S.apprFilter || 'offen';
+  const list = S.requests.filter(r => f === 'offen' ? r.status === 'offen' : r.status !== 'offen' && r.end_date >= today());
+  const nOpen = S.requests.filter(r => r.status === 'offen').length;
+  let h = `<div class="chips" style="margin:10px 0 4px">${[['offen', `Offen (${nOpen})`], ['bearbeitet', 'Bearbeitet']].map(([k, l]) =>
+    `<button class="chip ${f === k ? 'on' : ''}" data-action="apprFilter" data-f="${k}">${l}</button>`).join('')}</div>`;
+  if (!list.length) return h + `<div class="card empty" style="margin-top:12px">${f === 'offen' ? 'Alles erledigt 👍' : 'Keine bearbeiteten Einträge ab heute.'}</div>`;
+  const groups = new Map();
+  for (const r of list) { if (!groups.has(r.employee_id)) groups.set(r.employee_id, []); groups.get(r.employee_id).push(r); }
+  const ids = [...groups.keys()].filter(emp).sort((a, b) => emp(a).name.localeCompare(emp(b).name, 'de'));
+  for (const id of ids) {
+    const e = emp(id), rs = groups.get(id).sort((a, b) => a.start_date.localeCompare(b.start_date));
+    const years = [...new Set(rs.filter(r => r.kind === 'ferien').flatMap(r => yearsOf(r.start_date, r.end_date)))];
+    const bal = years.map(y => { const b = balance(id, y); if (b.total == null) return '';
+      return `<div class="bal" style="${b.left < 0 ? 'color:var(--danger);font-weight:600' : ''}">Guthaben ${y}: ${b.left < 0 ? `überzogen um ${fmtD(-b.left)}` : `${fmtD(b.left)} übrig`} von ${fmtD(b.total)} <span class="muted">(inkl. offene)</span></div>`; }).join('');
+    h += `<div class="card" style="margin-top:12px"><div class="item">${avatar(e)}<div class="body">
+        <div class="title">${esc(e.name)} <span class="small muted">${e.category}${e.hourly ? ' · Stundenlohn' : e.pensum < 100 ? ` · ${e.pensum} %` : ''}</span></div>${bal}</div>
+        ${f === 'offen' && rs.length > 1 ? `<button class="btn sm ok" style="flex:none" data-action="approveAll" data-id="${id}">Alle ${rs.length} ✓</button>` : ''}</div>
+      ${rs.map(apprRow).join('')}</div>`;
+  }
+  return h;
+}
+
+function apprRow(r) {
+  const c = r.status !== 'abgelehnt' && S.conflicts.get(r.id);
+  const ahead = c ? [...c.ahead].map(id => S.requests.find(x => x.id === id)).map(a => `${esc(emp(a.employee_id)?.name)}${a.is_prio ? ' (Prio)' : ''}`).join(', ') : '';
+  return `<div class="appr-row"><b>${fmtRange(r.start_date, r.end_date)}</b>
+    <div class="small muted">${dayLabel(r)} · KW ${isoWeek(parse(r.start_date))} ${statusTag(r)}</div>
+    ${c ? `<div class="conf">⚠️ Limit an ${c.days} Tag${c.days > 1 ? 'en' : ''} überschritten – Vorrang: ${ahead}</div>` : ''}
+    ${r.note ? `<div class="small" style="margin-top:4px">💬 ${esc(r.note)}</div>` : ''}
+    <div class="actions">
+      ${r.status !== 'genehmigt' ? `<button class="btn sm ok" data-action="status" data-s="genehmigt" data-id="${r.id}">Genehmigen</button>` : ''}
+      ${r.status !== 'abgelehnt' ? `<button class="btn sm danger" data-action="status" data-s="abgelehnt" data-id="${r.id}">Ablehnen</button>` : ''}
+      ${r.status !== 'offen' ? `<button class="btn sm" data-action="status" data-s="offen" data-id="${r.id}">Auf offen</button>` : ''}
+      ${r.status !== 'offen' ? `<button class="btn sm" data-action="adminDel" data-id="${r.id}">Löschen</button>` : ''}
+    </div></div>`;
 }
 
 function adminCard(r) {
@@ -548,7 +595,7 @@ function adminCard(r) {
       </div></div>`;
 }
 
-function renderAdminRest(done, card) {
+function renderAdminRest() {
   let h = '';
   const upcoming = S.blocks.filter(b => b.end_date >= today());
   h += `<h2>Sperrtage</h2><div class="card">
@@ -587,7 +634,6 @@ function renderAdminRest(done, card) {
       <div class="row" id="ex-${e.id}" style="flex:1 1 100%;${e.hourly ? 'display:none' : ''}">
         <div><label class="f">Pensum %</label><input type="number" id="ep-${e.id}" min="10" max="100" inputmode="numeric" value="${e.pensum ?? 100}"></div>
         <div><label class="f">Ferientage/Jahr</label><input type="number" id="ed-${e.id}" min="0" max="366" step="0.5" inputmode="decimal" value="${e.vacation_days ?? ''}"></div></div></div>`).join('') + `</div>`;
-  h += `<h2>Bearbeitet (zukünftig)</h2>` + (done.length ? done.map(card).join('') : '<div class="card empty">–</div>');
   h += `<h2>Einstellungen</h2><div class="card"><label class="f">Neue Admin-PIN</label>
     <div class="row"><input type="password" inputmode="numeric" id="newPin" autocomplete="new-password"><button class="btn sm" style="flex:none" data-action="changePin">Ändern</button></div>
     <div class="actions"><button class="btn sm danger" data-action="logout">Admin abmelden</button></div></div>`;
@@ -611,7 +657,7 @@ function renderPlanner(admin = true) {
   const y = S.plYear || new Date().getFullYear();
   const label = yearMode ? y : S.month.toLocaleDateString('de-CH', { month: 'long', year: 'numeric' });
   let h = `<div class="row" style="margin:12px 0 10px;justify-content:space-between">
-      ${admin ? '<button class="btn sm" style="flex:none" data-action="plBack">‹ Admin</button>' : '<span></span>'}
+      <span></span>
       <div class="chips" style="flex:none">${['Monat', 'Jahr'].map(v => `<button class="chip ${(S.plView || 'Monat') === v ? 'on' : ''}" data-action="plView" data-v="${v}">${v}</button>`).join('')}</div></div>
     <div class="cal-head"><button class="navbtn" data-action="plPrev" aria-label="Zurück">‹</button><b>${label}</b>
       <button class="navbtn" data-action="plNext" aria-label="Weiter">›</button></div>`;
@@ -836,8 +882,17 @@ document.addEventListener('click', async ev => {
     case 'logout': S.pin = null; localStorage.removeItem('fp_pin'); render(); break;
     case 'kind': S.kind = t.dataset.k; renderSheet(); break;
     case 'teamView': S.teamView = t.dataset.v; closeSheet(); render(); break;
-    case 'planner': S.adminView = 'planner'; render(); window.scrollTo(0, 0); break;
-    case 'plBack': S.adminView = null; closeSheet(); render(); window.scrollTo(0, 0); break;
+    case 'adminView': S.adminView = t.dataset.v; closeSheet(); render(); window.scrollTo(0, 0); break;
+    case 'apprFilter': S.apprFilter = t.dataset.f; render(); break;
+    case 'approveAll': {
+      const rs = S.requests.filter(r => r.employee_id === id && r.status === 'offen');
+      const nConf = rs.filter(r => S.conflicts.has(r.id)).length;
+      if (!confirm(`Alle ${rs.length} offenen Einträge von ${emp(id).name} genehmigen?${nConf ? `\n\nAchtung: ${nConf} davon überschreiten das Limit.` : ''}`)) break;
+      for (const r of rs) {
+        const { error } = await db.rpc('admin_set_status', { p_pin: S.pin, p_id: r.id, p_status: 'genehmigt' });
+        if (error) { await load(); return toast('Fehler: ' + error.message); }
+      }
+      await load(); toast(`${rs.length} Einträge genehmigt ✓`); break; }
     case 'plView': S.plView = t.dataset.v; if (S.plView === 'Jahr') S.plYear = S.month.getFullYear(); else if (S.plYear) S.month = new Date(S.plYear, S.plYear === new Date().getFullYear() ? new Date().getMonth() : 0, 1); render(); break;
     case 'plPrev': case 'plNext': {
       const dir = a === 'plNext' ? 1 : -1;
