@@ -13,13 +13,13 @@
   --bg:#f5f3ef; --card:#fff; --ink:#1d2733; --muted:#6b7480; --line:#e6e2db;
   --clinic:#0f9d8a; --verkauf:#e8833a; --accent:#1d2733; --danger:#d64545; --ok:#2e9d5b;
   --sel:#dfe9ff; --selInk:#2a5bd7; --full:#fde8e8; --blk:#e2ddd4;
-  --holCH:#d52b1e; --holCHbg:#fdecea; --holZH:#0f5fa8; --holZHbg:#e3eefa;
+  --holCH:#d52b1e; --holCHbg:#fdecea; --holZH:#0f5fa8; --holZHbg:#e3eefa; --pruef:#c2417a;
   --radius:14px;
 }
 @media (prefers-color-scheme:dark){
   :root{--bg:#12171d; --card:#1c232b; --ink:#eef1f4; --muted:#9aa4af; --line:#2c353f;
     --accent:#eef1f4; --sel:#22345a; --selInk:#8fb0ff; --full:#3a2226; --blk:#323c47;
-    --holCH:#ff7b70; --holCHbg:#3a2224; --holZH:#7db7f0; --holZHbg:#1d2c3d;}
+    --holCH:#ff7b70; --holCHbg:#3a2224; --holZH:#7db7f0; --holZHbg:#1d2c3d; --pruef:#e46aa0;}
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--ink);
@@ -48,10 +48,10 @@ h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted
 .chip.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
 .tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;margin-left:4px;vertical-align:1px}
 .t-offen{background:#fff2d6;color:#8a5a00} .t-genehmigt{background:#dcf3e5;color:#1d6b3e} .t-abgelehnt{background:#fbe0e0;color:#9b2c2c}
-.t-prio{background:#ece4ff;color:#5b3cc4} .t-konflikt{background:#fbe0e0;color:#9b2c2c}
+.t-prio{background:#ece4ff;color:#5b3cc4} .t-konflikt{background:#fbe0e0;color:#9b2c2c} .t-pruef{background:#fbe3ef;color:#a3245e}
 @media (prefers-color-scheme:dark){
   .t-offen{background:#3d3218;color:#f3cf7a} .t-genehmigt{background:#183526;color:#7fdca3}
-  .t-abgelehnt,.t-konflikt{background:#3d1d1d;color:#f19a9a} .t-prio{background:#2b2350;color:#b9a6ff}
+  .t-abgelehnt,.t-konflikt{background:#3d1d1d;color:#f19a9a} .t-prio{background:#2b2350;color:#b9a6ff} .t-pruef{background:#3d1a2b;color:#f29cc4}
 }
 
 /* Kalender */
@@ -86,7 +86,8 @@ h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted
 .dot{width:7px;height:7px;border-radius:50%}
 .dot.Clinic{background:var(--clinic)} .dot.Verkauf{background:var(--verkauf)}
 .dot.offen{background:transparent!important;border:1.5px solid}
-.dot.offen.Clinic{border-color:var(--clinic)} .dot.offen.Verkauf{border-color:var(--verkauf)}
+.dot.pruef{background:var(--pruef)}
+.dot.offen.Clinic{border-color:var(--clinic)} .dot.offen.Verkauf{border-color:var(--verkauf)} .dot.offen.pruef{border-color:var(--pruef)}
 .more{font-size:9px;color:var(--muted);line-height:7px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:12px 4px}
 .legend span{display:inline-flex;align-items:center;gap:5px}
@@ -169,10 +170,11 @@ table.pl{border-collapse:separate;border-spacing:0;font-size:11px;min-width:100%
 .bar.Clinic{background:var(--clinic)} .bar.Verkauf{background:var(--verkauf)}
 .bar.offen{opacity:.4}
 .bar.prio{box-shadow:inset 0 -4px 0 #5b3cc4}
+.bar.pruef,.wk.pruef{background:var(--pruef)}
 .bar.start{border-radius:5px 0 0 5px} .bar.end{border-radius:0 5px 5px 0} .bar.start.end{border-radius:5px}
 .wk{display:block;width:calc(100% - 4px);margin:0 2px;height:20px;border-radius:4px;border:none;padding:0;color:#fff;font-weight:700;font-size:11px;line-height:20px}
 .wk.Clinic{background:var(--clinic)} .wk.Verkauf{background:var(--verkauf)}
-.wk.offen{background:transparent;border:2px solid;line-height:16px} .wk.offen.Clinic{border-color:var(--clinic);color:var(--clinic)} .wk.offen.Verkauf{border-color:var(--verkauf);color:var(--verkauf)}
+.wk.offen{background:transparent;border:2px solid;line-height:16px} .wk.offen.pruef{border-color:var(--pruef)!important;color:var(--pruef)!important;background:transparent} .wk.offen.Clinic{border-color:var(--clinic);color:var(--clinic)} .wk.offen.Verkauf{border-color:var(--verkauf);color:var(--verkauf)}
 .pl-legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);margin:10px 4px}
 .pl-legend span{display:inline-flex;align-items:center;gap:5px}
 .pl-legend i{display:inline-block;width:16px;height:10px;border-radius:3px}
@@ -255,7 +257,8 @@ function balance(empId, y) {
     const n = daysInYear(r.start_date, r.end_date, y);
     if (r.status === 'genehmigt') appr += ft(n, empId); else open += ft(n, empId);
   }
-  const total = emp(empId)?.vacation_days == null ? null : Number(emp(empId).vacation_days);
+  const e = emp(empId);   // Stundenlöhner haben kein Guthaben (Ferienentschädigung über den Lohn)
+  const total = e?.hourly || e?.vacation_days == null ? null : Number(e.vacation_days);
   return { total, appr, open, left: total == null ? null : Math.round((total - appr - open) * 10) / 10 };
 }
 function yearsOf(a, b) { const out = []; for (let y = +a.slice(0, 4); y <= +b.slice(0, 4); y++) out.push(y); return out; }
@@ -297,8 +300,10 @@ function toast(msg) {
   const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
   document.body.appendChild(t); setTimeout(() => { t.style.opacity = 0; setTimeout(() => t.remove(), 250); }, 2600);
 }
+function dayLabel(r) { return emp(r.employee_id)?.hourly ? `${workDays(r.start_date, r.end_date)} Arbeitstage` : fmtD(wd(r)) + ' Ferientage'; }
 function statusTag(r) {
-  let h = r.is_prio ? '<span class="tag t-prio">Prio</span>' : '';
+  let h = r.kind === 'pruefung' ? '<span class="tag t-pruef">Prüfung</span>' : '';
+  h += r.is_prio ? '<span class="tag t-prio">Prio</span>' : '';
   h += `<span class="tag t-${r.status}">${r.status}</span>`;
   if (r.status !== 'abgelehnt' && S.conflicts.has(r.id)) h += '<span class="tag t-konflikt">Konflikt</span>';
   return h;
@@ -340,7 +345,7 @@ function computeConflicts() {
       S.dayMap.get(d).push(r);
       const k = d + '|' + e.category;
       if (!perCat.has(k)) perCat.set(k, []);
-      perCat.get(k).push(r);
+      if (!e.hourly) perCat.get(k).push(r);
     }
   }
   for (const [k, list] of perCat) {
@@ -399,7 +404,7 @@ function renderCal() {
   const m = S.month, me = emp(S.me);
   const start = new Date(m); start.setDate(1 - ((m.getDay() + 6) % 7));
   const label = m.toLocaleDateString('de-CH', { month: 'long', year: 'numeric' });
-  const lim = me ? S.limits[me.category] || 1 : Infinity;
+  const lim = me && !me.hourly ? S.limits[me.category] || 1 : Infinity;
   const blocks = blocksFor(S.blockMode ? null : me.category);
   let h = (S.blockMode ? `<div class="banner"><span>🔒 Sperrtage wählen: Start- und Endtag antippen</span>
     <button class="btn sm primary" data-action="endBlockMode">Fertig</button></div>` : '') + `<div class="cal-head"><button class="navbtn" data-action="prev" aria-label="Vorheriger Monat">‹</button>
@@ -414,7 +419,7 @@ function renderCal() {
     for (let i = 0; i < 7; i++, d.setDate(d.getDate() + 1)) {
       const ds = iso(d);
       const list = (S.dayMap.get(ds) || []).filter(r => S.filter === 'Alle' || emp(r.employee_id).category === S.filter);
-      const sameCatOthers = me ? (S.dayMap.get(ds) || []).filter(r => r.employee_id !== S.me && emp(r.employee_id).category === me.category).length : 0;
+      const sameCatOthers = me ? (S.dayMap.get(ds) || []).filter(r => r.employee_id !== S.me && emp(r.employee_id).category === me.category && !emp(r.employee_id).hourly).length : 0;
       const blocked = blocks.some(b => ds >= b.start_date && ds <= b.end_date);
       const hol = holiday(ds);
       const cls = ['day',
@@ -422,7 +427,7 @@ function renderCal() {
         sameCatOthers >= lim && 'full', blocked && 'blocked',
         (S.dayMap.get(ds) || []).some(r => r.employee_id === S.me) && 'mine',
         S.sel && ds >= S.sel.start && ds <= S.sel.end && 'sel'].filter(Boolean).join(' ');
-      const dots = list.slice(0, 6).map(r => `<span class="dot ${emp(r.employee_id).category} ${r.status}"></span>`).join('');
+      const dots = list.slice(0, 6).map(r => `<span class="dot ${emp(r.employee_id).category} ${r.status}${r.kind === 'pruefung' ? ' pruef' : ''}"></span>`).join('');
       h += `<button class="${cls}" data-action="day" data-d="${ds}"${hol ? ` title="${hol.name}"` : ''}>${blocked ? '<span class="lock">🔒</span>' : ''}<span class="n">${d.getDate()}</span>
         <span class="dots">${dots}</span>${list.length > 6 ? `<span class="more">+${list.length - 6}</span>` : ''}</button>`;
     }
@@ -430,7 +435,8 @@ function renderCal() {
   h += `</div><div class="legend">
     <span><i class="dot Clinic"></i>Clinic</span><span><i class="dot Verkauf"></i>Verkauf</span>
     <span><i class="dot offen Clinic"></i>offen</span>
-    ${me ? `<span><i style="width:14px;height:10px;border-radius:3px;background:var(--full);display:inline-block"></i>${me.category} voll</span>` : ''}
+    ${me && !me.hourly ? `<span><i style="width:14px;height:10px;border-radius:3px;background:var(--full);display:inline-block"></i>${me.category} voll</span>` : ''}
+    <span><i class="dot pruef"></i>Prüfung</span>
     <span><i class="hol-dot CH"></i>Feiertag CH</span><span><i class="hol-dot ZH"></i>Feiertag ZH</span>
     <span><i style="width:14px;height:10px;border-radius:3px;background:repeating-linear-gradient(135deg,var(--card) 0 3px,var(--blk) 3px 6px);display:inline-block;border:1px solid var(--line)"></i>Sperrtag</span>
   </div>${(() => { const ms = iso(m).slice(0, 7), list = Object.values(holidays(m.getFullYear())).filter(h => h.d.startsWith(ms)).sort((a, b) => a.d.localeCompare(b.d));
@@ -444,6 +450,8 @@ function renderMine() {
   const y = new Date().getFullYear();
   const prios = mine.filter(r => r.is_prio && r.status !== 'abgelehnt');
   const years = [...new Set([y, ...mine.filter(r => r.status !== 'abgelehnt').flatMap(r => yearsOf(r.start_date, r.end_date))])].filter(x => x >= y).sort();
+  if (emp(S.me).hourly) return renderMineList(mine, `<h2>Übersicht</h2><div class="card small">Du bist im <b>Stundenlohn</b>: Ferien werden über den Lohn entschädigt.
+    Trage hier deine <b>Prüfungsphasen</b> und <b>Ferien</b> ein – der Admin bestätigt sie.</div><h2>Meine Einträge</h2>`);
   let h = `<h2>Übersicht</h2><div class="card small">
     ${years.map(yy => { const b = balance(S.me, yy);
       return `<div style="margin-bottom:6px">Ferientage ${yy}: ${b.total == null ? '<span class="muted">Guthaben nicht hinterlegt</span>'
@@ -451,9 +459,13 @@ function renderMine() {
         <span class="muted">${fmtD(b.appr)} genehmigt · ${fmtD(b.open)} beantragt${pensum(S.me) < 100 ? ` · Pensum ${pensum(S.me)} %` : ''}</span></div>`; }).join('')}
     <div>Prio-Woche: ${prios.length ? prios.map(p => `<b>KW ${isoWeek(parse(p.start_date))}/${p.start_date.slice(0, 4)}</b>`).join(', ') : '<span class="muted">noch keine gewählt</span>'}</div>
   </div><h2>Meine Wünsche</h2>`;
+  return renderMineList(mine, h);
+}
+
+function renderMineList(mine, h) {
   if (!mine.length) return h + `<div class="card empty">Noch nichts eingetragen.<br><br><button class="btn primary" data-tab="cal">Im Kalender eintragen</button></div>`;
   return h + mine.map(r => `<div class="card"><div class="title">${fmtRange(r.start_date, r.end_date)}</div>
-    <div class="small muted">${fmtD(wd(r))} Ferientage · KW ${isoWeek(parse(r.start_date))} ${statusTag(r)}</div>
+    <div class="small muted">${dayLabel(r)} · KW ${isoWeek(parse(r.start_date))} ${statusTag(r)}</div>
     ${r.note ? `<div class="small" style="margin-top:6px">${esc(r.note)}</div>` : ''}
     ${conflictText(r)}
     ${r.status === 'offen' ? `<div class="actions"><button class="btn sm danger" data-action="delMine" data-id="${r.id}">Zurückziehen</button></div>` : ''}
@@ -476,7 +488,7 @@ function renderTeam() {
     if (mo !== cur) { if (cur) h += '</div>'; h += `<h2>${mo}</h2><div class="card">`; cur = mo; }
     const e = emp(r.employee_id);
     h += `<div class="item" style="padding:6px 0">${avatar(e)}<div class="body"><div class="title">${esc(e.name)}</div>
-      <div class="small muted">${fmtRange(r.start_date, r.end_date)} · ${fmtD(wd(r))} Ferientage ${statusTag(r)}</div></div></div>`;
+      <div class="small muted">${fmtRange(r.start_date, r.end_date)} · ${dayLabel(r)} ${statusTag(r)}</div></div></div>`;
   }
   return h + '</div>';
 }
@@ -497,8 +509,8 @@ function renderAdmin() {
 function adminCard(r) {
     const e = emp(r.employee_id);
     return `<div class="card"><div class="item">${avatar(e)}<div class="body">
-      <div class="title">${esc(e.name)} <span class="small muted">${e.category}${e.pensum < 100 ? ` · ${e.pensum} %` : ''}</span></div>
-      <div class="small muted">${fmtRange(r.start_date, r.end_date)} · ${fmtD(wd(r))} Ferientage ${statusTag(r)}</div>
+      <div class="title">${esc(e.name)} <span class="small muted">${e.category}${e.hourly ? ' · Stundenlohn' : e.pensum < 100 ? ` · ${e.pensum} %` : ''}</span></div>
+      <div class="small muted">${fmtRange(r.start_date, r.end_date)} · ${dayLabel(r)} ${statusTag(r)}</div>
       ${yearsOf(r.start_date, r.end_date).map(y => { const b = balance(e.id, y); return b.total == null ? '' :
         `<div class="small" style="margin-top:4px;${b.left < 0 ? 'color:var(--danger);font-weight:600' : ''}">Guthaben ${y}: ${b.left < 0 ? `überzogen um ${fmtD(-b.left)}` : `${fmtD(b.left)} übrig`} von ${fmtD(b.total)} (inkl. offene)</div>`; }).join('')}
       ${r.note ? `<div class="small" style="margin-top:4px">${esc(r.note)}</div>` : ''}</div></div>
@@ -531,7 +543,8 @@ function renderAdminRest(done, card) {
   h += `<h2>Mitarbeiter (${S.employees.length})</h2><div class="card"><label class="f">Neue Mitarbeiter – ein Name pro Zeile</label>
       <textarea id="newNames" rows="4" placeholder="Anna Muster&#10;Ben Beispiel"></textarea>
       <div class="row" style="margin-top:8px"><select id="newCat">${CATS.map(c => `<option ${c === S.lastCat ? 'selected' : ''}>${c}</option>`).join('')}</select>
-      </div><div class="row" style="margin-top:8px">
+      <select id="newHourly"><option value="0">Festangestellt</option><option value="1" ${S.lastHourly ? 'selected' : ''}>Stundenlohn</option></select>
+      </div><div class="row" id="newEx" style="margin-top:8px;${S.lastHourly ? 'display:none' : ''}">
       <div><label class="f">Pensum %</label><input type="number" id="newPensum" min="10" max="100" inputmode="numeric" value="${S.lastPensum ?? 100}"></div>
       <div><label class="f">Ferientage/Jahr</label><input type="number" id="newDays" min="0" max="366" step="0.5" inputmode="decimal" value="${S.lastDays ?? FULL_DAYS * (S.lastPensum ?? 100) / 100}"></div></div>
       <div class="actions"><button class="btn sm primary block" data-action="addEmp">Hinzufügen</button></div></div>
@@ -540,9 +553,11 @@ function renderAdminRest(done, card) {
       <select id="ec-${e.id}">${CATS.map(c => `<option ${c === e.category ? 'selected' : ''}>${c}</option>`).join('')}</select>
       <select id="ea-${e.id}"><option value="1" ${e.active ? 'selected' : ''}>aktiv</option><option value="0" ${e.active ? '' : 'selected'}>inaktiv</option></select>
       <div class="row" style="flex:1 1 100%">
+        <select id="eh-${e.id}"><option value="0">Festangestellt</option><option value="1" ${e.hourly ? 'selected' : ''}>Stundenlohn</option></select>
+        <button class="btn sm" style="flex:none;min-height:44px" data-action="saveEmp" data-id="${e.id}">Speichern</button></div>
+      <div class="row" id="ex-${e.id}" style="flex:1 1 100%;${e.hourly ? 'display:none' : ''}">
         <div><label class="f">Pensum %</label><input type="number" id="ep-${e.id}" min="10" max="100" inputmode="numeric" value="${e.pensum ?? 100}"></div>
-        <div><label class="f">Ferientage/Jahr</label><input type="number" id="ed-${e.id}" min="0" max="366" step="0.5" inputmode="decimal" value="${e.vacation_days ?? ''}"></div>
-        <button class="btn sm" style="flex:none;align-self:flex-end;min-height:44px" data-action="saveEmp" data-id="${e.id}">Speichern</button></div></div>`).join('') + `</div>`;
+        <div><label class="f">Ferientage/Jahr</label><input type="number" id="ed-${e.id}" min="0" max="366" step="0.5" inputmode="decimal" value="${e.vacation_days ?? ''}"></div></div></div>`).join('') + `</div>`;
   h += `<h2>Bearbeitet (zukünftig)</h2>` + (done.length ? done.map(card).join('') : '<div class="card empty">–</div>');
   h += `<h2>Einstellungen</h2><div class="card"><label class="f">Neue Admin-PIN</label>
     <div class="row"><input type="password" inputmode="numeric" id="newPin" autocomplete="new-password"><button class="btn sm" style="flex:none" data-action="changePin">Ändern</button></div>
@@ -552,7 +567,7 @@ function renderAdminRest(done, card) {
 
 /* ---------- Admin-Planer ---------- */
 function reqOn(eid, ds) { return S.requests.find(r => r.employee_id === eid && r.status !== 'abgelehnt' && ds >= r.start_date && ds <= r.end_date); }
-function countOn(ds, cat) { return (S.dayMap.get(ds) || []).filter(r => emp(r.employee_id)?.category === cat).length; }
+function countOn(ds, cat) { return (S.dayMap.get(ds) || []).filter(r => emp(r.employee_id)?.category === cat && !emp(r.employee_id).hourly).length; }
 function blockedFor(ds, cat) { return blocksFor(cat).some(b => ds >= b.start_date && ds <= b.end_date); }
 function dayCls(ds, cat) {
   const w = parse(ds).getDay(), h = holiday(ds);
@@ -560,7 +575,7 @@ function dayCls(ds, cat) {
 }
 function plEmployees(cat) { return S.employees.filter(e => e.category === cat && (e.active || S.requests.some(r => r.employee_id === e.id && r.status !== 'abgelehnt'))); }
 // admin = false: Team-Ansicht ohne Pensum, Guthaben und Freigabe
-function plName(e, admin) { return `<th class="nm" title="${esc(e.name)}">${esc(e.name)}${admin && e.pensum < 100 ? ` <small>${e.pensum}%</small>` : ''}</th>`; }
+function plName(e, admin) { return `<th class="nm" title="${esc(e.name)}">${esc(e.name)}${e.hourly ? ' <small>Std.</small>' : admin && e.pensum < 100 ? ` <small>${e.pensum}%</small>` : ''}</th>`; }
 
 function renderPlanner(admin = true) {
   const yearMode = S.plView === 'Jahr';
@@ -574,7 +589,7 @@ function renderPlanner(admin = true) {
   h += `<div class="pl-wrap">${yearMode ? plYear(y, admin) : plMonth(admin)}</div>`;
   h += `<div class="pl-legend">
     <span><i style="background:var(--clinic)"></i>Clinic</span><span><i style="background:var(--verkauf)"></i>Verkauf</span>
-    <span><i style="background:var(--verkauf);opacity:.4"></i>offen</span><span><i style="background:var(--verkauf);box-shadow:inset 0 -3px 0 #5b3cc4"></i>Prio</span>
+    <span><i style="background:var(--verkauf);opacity:.4"></i>offen</span><span><i style="background:var(--verkauf);box-shadow:inset 0 -3px 0 #5b3cc4"></i>Prio</span><span><i style="background:var(--pruef)"></i>Prüfung (Std.)</span>
     <span><i style="background:var(--holCHbg);border:1px solid var(--holCH)"></i>Feiertag CH</span><span><i style="background:var(--holZHbg);border:1px solid var(--holZH)"></i>Feiertag ZH</span>
     <span><i style="background:repeating-linear-gradient(135deg,var(--card) 0 3px,var(--blk) 3px 6px);border:1px solid var(--line)"></i>Sperrtag</span>
     <span><b style="color:var(--danger)">2</b>&nbsp;= mehr weg als erlaubt</span>
@@ -593,7 +608,7 @@ function plMonth(admin) {
       return `<td class="${n > lim ? 'over' : n && n === lim ? 'at' : ''}">${n || ''}</td>`; }).join('')}</tr>`;
     for (const e of plEmployees(cat)) {
       h += `<tr>${plName(e, admin)}${dates.map(ds => { const r = reqOn(e.id, ds);
-        const bar = r ? `<button class="bar ${cat} ${r.status}${r.is_prio ? ' prio' : ''}${ds === r.start_date || ds.endsWith('-01') ? ' start' : ''}${ds === r.end_date || ds === dates[nd - 1] ? ' end' : ''}"
+        const bar = r ? `<button class="bar ${cat} ${r.status}${r.is_prio ? ' prio' : ''}${r.kind === 'pruefung' ? ' pruef' : ''}${ds === r.start_date || ds.endsWith('-01') ? ' start' : ''}${ds === r.end_date || ds === dates[nd - 1] ? ' end' : ''}"
           data-action="plReq" data-id="${r.id}" aria-label="${esc(e.name)} ${fmtRange(r.start_date, r.end_date)}"></button>` : '';
         return `<td class="${dayCls(ds, cat)}">${bar}</td>`; }).join('')}</tr>`;
     }
@@ -623,8 +638,8 @@ function plYear(y, admin) {
         if (!rs.length) return '<td></td>';
         const n = rs.reduce((sum, r) => { const k = workDays(r.start_date > mon ? r.start_date : mon, r.end_date < addDays(mon, 6) ? r.end_date : addDays(mon, 6));
           return sum + (admin ? ft(k, e.id) : k); }, 0);
-        const open = rs.some(r => r.status === 'offen');
-        return `<td><button class="wk ${cat}${open ? ' offen' : ''}" data-action="plWeek" data-d="${addDays(mon, 3)}" title="${fmtRange(mon, addDays(mon, 6))}">${fmtD(n)}</button></td>`;
+        const open = rs.some(r => r.status === 'offen'), pruef = rs.every(r => r.kind === 'pruefung');
+        return `<td><button class="wk ${cat}${open ? ' offen' : ''}${pruef ? ' pruef' : ''}" data-action="plWeek" data-d="${addDays(mon, 3)}" title="${fmtRange(mon, addDays(mon, 6))}">${fmtD(n)}</button></td>`;
       }).join('')}${admin ? `<td class="tot">${fmtD(b.appr + b.open)}${b.total != null ? ` / ${fmtD(b.total)}` : ''}</td>` : ''}</tr>`;
     }
   }
@@ -634,7 +649,7 @@ function plYear(y, admin) {
 function renderPlReqSheet() {
   const r = S.requests.find(x => x.id === S.plReq);
   if (!r) return closeSheet();
-  $('sheetBody').innerHTML = `<div class="row" style="justify-content:space-between;margin-bottom:8px"><b style="flex:none">Ferienwunsch</b>
+  $('sheetBody').innerHTML = `<div class="row" style="justify-content:space-between;margin-bottom:8px"><b style="flex:none">${r.kind === 'pruefung' ? 'Prüfungsphase' : 'Ferienwunsch'}</b>
     <button class="btn sm" style="flex:none" data-action="close">Schliessen</button></div>${S.tab === 'admin' ? adminCard(r) : teamCard(r)}`;
 }
 
@@ -652,13 +667,15 @@ function closeSheet() { S.sel = null; S.plReq = null; $('sheet').classList.remov
 function renderSheet() {
   if (S.blockMode) return renderBlockSheet();
   const { start, end } = S.sel, me = emp(S.me), n = diff(start, end) + 1;
-  const blockedHit = blocksFor(me.category).filter(b => overlaps(b, start, end));
+  // Stundenlöhner: Prüfungsphase oder Ferien, kein Guthaben, keine Prio, zählen nicht zum Limit
+  const hourly = !!me.hourly, isPruef = hourly && (S.kind || 'pruefung') === 'pruefung';
+  const blockedHit = isPruef ? [] : blocksFor(me.category).filter(b => overlaps(b, start, end));
   const year = start.slice(0, 4);
   const lim = S.limits[me.category] || 1;
   const away = S.requests.filter(r => r.status !== 'abgelehnt' && r.employee_id !== S.me && overlaps(r, start, end));
   let fullDays = 0;
   for (let d = start; d <= end; d = addDays(d, 1))
-    if ((S.dayMap.get(d) || []).filter(r => r.employee_id !== S.me && emp(r.employee_id).category === me.category).length >= lim) fullDays++;
+    if (!hourly && (S.dayMap.get(d) || []).filter(r => r.employee_id !== S.me && emp(r.employee_id).category === me.category && !emp(r.employee_id).hourly).length >= lim) fullDays++;
   const prioUsed = S.requests.find(r => r.employee_id === S.me && r.is_prio && r.status !== 'abgelehnt' && r.start_date.startsWith(year));
   const prioOk = !prioUsed && n <= 7;
   const prioHint = prioUsed ? `Deine Prio-Woche ${year} ist schon vergeben (KW ${isoWeek(parse(prioUsed.start_date))}).`
@@ -666,13 +683,17 @@ function renderSheet() {
     : 'Einmal pro Jahr. Hat Vorrang vor normalen Wünschen, wenn zu viele gleichzeitig weg wollen.';
   const prev = $('prio')?.checked, prevNote = $('fNote')?.value || '';
   $('sheetBody').innerHTML = `
-    <div class="row" style="justify-content:space-between"><b style="flex:none">Ferien · ${fmtD(ft(workDays(start, end), S.me))} Ferientag${ft(workDays(start, end), S.me) === 1 ? '' : 'e'}</b>
+    <div class="row" style="justify-content:space-between"><b style="flex:none">${hourly
+      ? `${isPruef ? 'Prüfungsphase' : 'Ferien'} · ${workDays(start, end)} Arbeitstag${workDays(start, end) === 1 ? '' : 'e'}`
+      : `Ferien · ${fmtD(ft(workDays(start, end), S.me))} Ferientag${ft(workDays(start, end), S.me) === 1 ? '' : 'e'}`}</b>
       <button class="btn sm" style="flex:none" data-action="close">Schliessen</button></div>
+    ${hourly ? `<div class="chips" style="margin-top:10px">${[['pruefung', '📚 Prüfungsphase'], ['ferien', '🌴 Ferien']].map(([k, l]) =>
+      `<button class="chip ${(S.kind || 'pruefung') === k ? 'on' : ''}" data-action="kind" data-k="${k}">${l}</button>`).join('')}</div>` : ''}
     <div class="row" style="margin-top:10px">
       <div><label class="f">Von</label><input type="date" id="fFrom" value="${start}"></div>
       <div><label class="f">Bis</label><input type="date" id="fTo" value="${end}"></div>
     </div>
-    ${start === end ? '<p class="small muted" style="margin:8px 0 0">Tippe im Kalender auf den letzten Ferientag.</p>' : ''}
+    ${start === end ? '<p class="small muted" style="margin:8px 0 0">Tippe im Kalender auf den letzten Tag.</p>' : ''}
     ${(() => { const hs = holidaysIn(start, end); return hs.length ? `<p class="small muted" style="margin:10px 0 0">Feiertage in diesem Zeitraum:</p>${holList(hs)}` : ''; })()}
     ${blockedHit.length ? `<div class="warn">🔒 <b>Gesperrt</b> – in diesem Zeitraum können keine Ferien eingetragen werden:<br>${blockedHit.map(blockLabel).join('<br>')}</div>` : ''}
     ${yearsOf(start, end).map(y => { const b = balance(S.me, y); if (b.total == null) return '';
@@ -680,10 +701,10 @@ function renderSheet() {
       return after < 0 ? `<div class="warn">⚠️ Damit überziehst du dein Guthaben ${y} um <b>${fmtD(-after)} Tag${after === -1 ? '' : 'e'}</b> (${fmtD(b.total)} Tage/Jahr). Senden geht trotzdem – der Admin entscheidet.</div>`
         : `<p class="small muted" style="margin:10px 0 0">Danach übrig ${y}: <b>${fmtD(after)}</b> von ${fmtD(b.total)} Ferientagen</p>`; }).join('')}
     ${fullDays ? `<div class="warn">⚠️ An ${fullDays} Tag${fullDays > 1 ? 'en' : ''} sind schon ${lim} von ${me.category} weg (Limit ${lim}). ${prioOk ? 'Mit der Prio-Woche hast du Vorrang vor normalen Wünschen.' : 'Dein Wunsch kommt auf die Warteliste.'}</div>` : ''}
-    <label class="prio-box"><input type="checkbox" id="prio" ${prioOk ? '' : 'disabled'} ${prioOk && prev ? 'checked' : ''}>
-      <span><b>Als Prio-Woche markieren</b><br><span class="small muted">${prioHint}</span></span></label>
+    ${hourly ? '' : `<label class="prio-box"><input type="checkbox" id="prio" ${prioOk ? '' : 'disabled'} ${prioOk && prev ? 'checked' : ''}>
+      <span><b>Als Prio-Woche markieren</b><br><span class="small muted">${prioHint}</span></span></label>`}
     <input type="text" id="fNote" placeholder="Bemerkung (optional)" maxlength="200" value="${esc(prevNote)}">
-    <div class="actions"><button class="btn primary block" data-action="submit" ${blockedHit.length ? 'disabled' : ''}>Ferienwunsch senden</button></div>
+    <div class="actions"><button class="btn primary block" data-action="submit" ${blockedHit.length ? 'disabled' : ''}>${isPruef ? 'Prüfungsphase melden' : 'Ferienwunsch senden'}</button></div>
     <h2 style="margin-top:16px">In diesem Zeitraum weg (${away.length})</h2>
     ${away.length ? `<ul class="away">${away.map(r => { const e = emp(r.employee_id);
       return `<li>${avatar(e)}<span style="flex:1">${esc(e.name)}<br><span class="small muted">${fmtRange(r.start_date, r.end_date)}</span></span>${statusTag(r)}</li>`; }).join('')}</ul>`
@@ -712,16 +733,17 @@ function renderBlockSheet() {
 }
 
 async function submit() {
-  const start = $('fFrom').value, end = $('fTo').value, is_prio = $('prio').checked, note = $('fNote').value.trim() || null;
+  const start = $('fFrom').value, end = $('fTo').value, is_prio = !!$('prio')?.checked, note = $('fNote').value.trim() || null;
+  const kind = emp(S.me).hourly ? S.kind || 'pruefung' : 'ferien';
   if (!start || !end || end < start) return toast('Bitte gültige Daten wählen');
   if (start < today()) return toast('Ferien in der Vergangenheit geht nicht');
-  if (blocksFor(emp(S.me).category).some(b => overlaps(b, start, end))) return toast('Dieser Zeitraum ist gesperrt');
+  if (kind === 'ferien' && blocksFor(emp(S.me).category).some(b => overlaps(b, start, end))) return toast('Dieser Zeitraum ist gesperrt');
   if (S.requests.some(r => r.employee_id === S.me && r.status !== 'abgelehnt' && overlaps(r, start, end)))
-    return toast('Du hast in diesem Zeitraum schon einen Wunsch');
-  const { error } = await db.from('requests').insert({ employee_id: S.me, start_date: start, end_date: end, is_prio, note });
+    return toast('Du hast in diesem Zeitraum schon einen Eintrag');
+  const { error } = await db.from('requests').insert({ employee_id: S.me, start_date: start, end_date: end, is_prio, note, kind });
   if (error) return toast(error.code === '23505' ? 'Du hast für dieses Jahr schon eine Prio-Woche'
-    : error.message.startsWith('Gesperrt') ? error.message : 'Fehler: ' + error.message);
-  closeSheet(); toast('Ferienwunsch gesendet ✓'); await load();
+    : /^(Gesperrt|Stundenl|Prüfung)/.test(error.message) ? error.message : 'Fehler: ' + error.message);
+  closeSheet(); toast(kind === 'pruefung' ? 'Prüfungsphase gemeldet ✓' : 'Ferienwunsch gesendet ✓'); await load();
 }
 
 /* ---------- Admin ---------- */
@@ -781,6 +803,7 @@ document.addEventListener('click', async ev => {
       if (!data) { toast('Falsche PIN'); break; }
       S.pin = pin; localStorage.setItem('fp_pin', pin); render(); break; }
     case 'logout': S.pin = null; localStorage.removeItem('fp_pin'); render(); break;
+    case 'kind': S.kind = t.dataset.k; renderSheet(); break;
     case 'teamView': S.teamView = t.dataset.v; closeSheet(); render(); break;
     case 'planner': S.adminView = 'planner'; render(); window.scrollTo(0, 0); break;
     case 'plBack': S.adminView = null; closeSheet(); render(); window.scrollTo(0, 0); break;
@@ -804,16 +827,16 @@ document.addEventListener('click', async ev => {
     case 'saveEmp':
       if (await rpc('admin_save_employee', { p_id: id, p_name: $('en-' + id).value, p_category: $('ec-' + id).value, p_active: $('ea-' + id).value === '1',
         p_days: $('ed-' + id).value === '' ? null : Number($('ed-' + id).value),
-        p_pensum: Math.min(100, Math.max(10, Number($('ep-' + id).value) || 100)) })) toast('Gespeichert');
+        p_pensum: Math.min(100, Math.max(10, Number($('ep-' + id).value) || 100)), p_hourly: $('eh-' + id).value === '1' })) toast('Gespeichert');
       break;
     case 'addEmp': {
       const names = [...new Set($('newNames').value.split('\n').map(n => n.trim()).filter(Boolean))];
       if (!names.length) return toast('Bitte mindestens einen Namen eingeben');
       S.lastCat = $('newCat').value; S.lastDays = $('newDays').value === '' ? null : Number($('newDays').value);
-      S.lastPensum = Math.min(100, Math.max(10, Number($('newPensum').value) || 100));
+      S.lastPensum = Math.min(100, Math.max(10, Number($('newPensum').value) || 100)); S.lastHourly = $('newHourly').value === '1';
       const failed = [];
       for (const name of names) {
-        const { error } = await db.rpc('admin_save_employee', { p_pin: S.pin, p_id: null, p_name: name, p_category: S.lastCat, p_active: true, p_days: S.lastDays, p_pensum: S.lastPensum });
+        const { error } = await db.rpc('admin_save_employee', { p_pin: S.pin, p_id: null, p_name: name, p_category: S.lastCat, p_active: true, p_days: S.lastHourly ? null : S.lastDays, p_pensum: S.lastPensum, p_hourly: S.lastHourly });
         if (error?.message.includes('PIN')) { S.pin = null; localStorage.removeItem('fp_pin'); render(); return toast('PIN ungültig – bitte neu anmelden'); }
         if (error) failed.push(name + (error.code === '23505' ? ' (gibt es schon)' : ''));
       }
@@ -831,6 +854,8 @@ document.addEventListener('click', async ev => {
 
 document.addEventListener('change', ev => {
   if (S.sel && ev.target.id === 'bCat') return renderSheet();
+  const hm = ev.target.id.match(/^(eh-(\d+)|newHourly)$/);
+  if (hm) { $(hm[2] ? 'ex-' + hm[2] : 'newEx').style.display = ev.target.value === '1' ? 'none' : ''; return; }
   const pm = ev.target.id.match(/^(ep-(\d+)|newPensum)$/);
   if (pm && ev.target.value) {
     const days = Math.round(FULL_DAYS * Number(ev.target.value) / 100 * 2) / 2;   // auf halbe Tage
