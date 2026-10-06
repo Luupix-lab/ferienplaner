@@ -141,6 +141,41 @@ nav button.on{color:var(--ink);font-weight:600}
   background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;max-width:90vw;
   box-shadow:0 6px 20px rgba(0,0,0,.2);transition:opacity .2s}
 .empty{text-align:center;color:var(--muted);padding:24px 8px}
+
+/* Admin-Planer */
+body.wide main{max-width:none}
+.pl-wrap{overflow:auto;max-height:calc(100vh - 230px);border:1px solid var(--line);border-radius:12px;background:var(--card);-webkit-overflow-scrolling:touch}
+table.pl{border-collapse:separate;border-spacing:0;font-size:11px;min-width:100%}
+.pl th,.pl td{padding:0;height:28px;min-width:26px;text-align:center;border-bottom:1px solid var(--line)}
+.pl th.nm{position:sticky;left:0;z-index:2;background:var(--card);text-align:left;padding:0 8px;min-width:104px;max-width:130px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;font-size:12px;border-right:1px solid var(--line)}
+.pl th.nm small{font-weight:400;color:var(--muted)}
+.pl thead th{position:sticky;top:0;z-index:1;background:var(--card);font-weight:600;color:var(--muted);height:36px;line-height:1.15}
+.pl thead tr.mo th{height:20px;text-align:left;padding-left:4px;color:var(--ink);border-left:1px solid var(--line)}
+.pl thead tr.mo + tr th{top:20px}
+.pl thead th.nm{z-index:3}
+.pl thead th span{display:block;font-size:9px;font-weight:400}
+.pl .we{background:var(--bg)}
+.pl .hol-CH{background:var(--holCHbg)} .pl .hol-ZH{background:var(--holZHbg)}
+.pl thead .hol-CH{color:var(--holCH)} .pl thead .hol-ZH{color:var(--holZH)}
+.pl .blk{background:repeating-linear-gradient(135deg,transparent 0 4px,var(--blk) 4px 8px)}
+.pl .tod{box-shadow:inset 1px 0 0 var(--selInk),inset -1px 0 0 var(--selInk)}
+.pl thead .tod{color:var(--selInk)}
+.pl tr.grp > *{background:var(--bg);color:var(--muted);height:24px}
+.pl tr.grp th.nm{background:var(--bg);text-transform:uppercase;letter-spacing:.5px;font-size:11px}
+.pl td.at{color:#b07000;font-weight:700} .pl td.over{background:var(--full);color:var(--danger);font-weight:700}
+.pl td.tot{padding:0 8px;white-space:nowrap;font-weight:600}
+.bar{display:block;width:100%;height:18px;border:none;padding:0;margin:0}
+.bar.Clinic{background:var(--clinic)} .bar.Verkauf{background:var(--verkauf)}
+.bar.offen{opacity:.4}
+.bar.prio{box-shadow:inset 0 -4px 0 #5b3cc4}
+.bar.start{border-radius:5px 0 0 5px} .bar.end{border-radius:0 5px 5px 0} .bar.start.end{border-radius:5px}
+.wk{display:block;width:calc(100% - 4px);margin:0 2px;height:20px;border-radius:4px;border:none;padding:0;color:#fff;font-weight:700;font-size:11px;line-height:20px}
+.wk.Clinic{background:var(--clinic)} .wk.Verkauf{background:var(--verkauf)}
+.wk.offen{background:transparent;border:2px solid;line-height:16px} .wk.offen.Clinic{border-color:var(--clinic);color:var(--clinic)} .wk.offen.Verkauf{border-color:var(--verkauf);color:var(--verkauf)}
+.pl-legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);margin:10px 4px}
+.pl-legend span{display:inline-flex;align-items:center;gap:5px}
+.pl-legend i{display:inline-block;width:16px;height:10px;border-radius:3px}
 </style>
 </head>
 <body>
@@ -345,7 +380,8 @@ function render(quiet) {
   $('main').innerHTML = (me || S.blockMode ? '' : '<button class="btn sm" style="margin-top:4px" data-action="backToWho">‹ Zur Namensauswahl</button>')
     + { cal: renderCal, mine: renderMine, team: renderTeam, admin: renderAdmin }[S.tab]();
   if (draft && $('newNames')) $('newNames').value = draft;
-  if (S.sel) renderSheet();
+  document.body.classList.toggle('wide', S.tab === 'admin' && S.adminView === 'planner' && !!S.pin);
+  if (S.sel) renderSheet(); else if (S.plReq) renderPlReqSheet();
 }
 
 function renderWho() {
@@ -448,7 +484,14 @@ function renderAdmin() {
     <div class="actions"><button class="btn primary block" data-action="login">Anmelden</button></div></div>`;
   const open = S.requests.filter(r => r.status === 'offen').sort(rank);
   const done = S.requests.filter(r => r.status !== 'offen' && r.end_date >= today());
-  const card = r => {
+  const card = adminCard;
+  if (S.adminView === 'planner') return renderPlanner();
+  let h = `<button class="btn primary block" style="margin-top:12px" data-action="planner">📊 Ferienplaner-Übersicht</button>`;
+  h += `<h2>Offene Wünsche (${open.length})</h2>` + (open.length ? open.map(card).join('') : '<div class="card empty">Alles erledigt 👍</div>');
+  return h + renderAdminRest(done, card);
+}
+
+function adminCard(r) {
     const e = emp(r.employee_id);
     return `<div class="card"><div class="item">${avatar(e)}<div class="body">
       <div class="title">${esc(e.name)} <span class="small muted">${e.category}${e.pensum < 100 ? ` · ${e.pensum} %` : ''}</span></div>
@@ -463,8 +506,10 @@ function renderAdmin() {
         ${r.status !== 'offen' ? `<button class="btn sm" data-action="status" data-s="offen" data-id="${r.id}">Auf offen</button>` : ''}
         <button class="btn sm" data-action="adminDel" data-id="${r.id}">Löschen</button>
       </div></div>`;
-  };
-  let h = `<h2>Offene Wünsche (${open.length})</h2>` + (open.length ? open.map(card).join('') : '<div class="card empty">Alles erledigt 👍</div>');
+}
+
+function renderAdminRest(done, card) {
+  let h = '';
   const upcoming = S.blocks.filter(b => b.end_date >= today());
   h += `<h2>Sperrtage</h2><div class="card">
     <button class="btn primary block" data-action="blockMode">📅 Im Kalender auswählen</button>
@@ -502,9 +547,95 @@ function renderAdmin() {
   return h;
 }
 
+/* ---------- Admin-Planer ---------- */
+function reqOn(eid, ds) { return S.requests.find(r => r.employee_id === eid && r.status !== 'abgelehnt' && ds >= r.start_date && ds <= r.end_date); }
+function countOn(ds, cat) { return (S.dayMap.get(ds) || []).filter(r => emp(r.employee_id)?.category === cat).length; }
+function blockedFor(ds, cat) { return blocksFor(cat).some(b => ds >= b.start_date && ds <= b.end_date); }
+function dayCls(ds, cat) {
+  const w = parse(ds).getDay(), h = holiday(ds);
+  return [(w === 0 || w === 6) && 'we', h && 'hol-' + h.type, blockedFor(ds, cat) && 'blk', ds === today() && 'tod'].filter(Boolean).join(' ');
+}
+function plEmployees(cat) { return S.employees.filter(e => e.category === cat && (e.active || S.requests.some(r => r.employee_id === e.id && r.status !== 'abgelehnt'))); }
+function plName(e) { return `<th class="nm" title="${esc(e.name)}">${esc(e.name)}${e.pensum < 100 ? ` <small>${e.pensum}%</small>` : ''}</th>`; }
+
+function renderPlanner() {
+  const yearMode = S.plView === 'Jahr';
+  const y = S.plYear || new Date().getFullYear();
+  const label = yearMode ? y : S.month.toLocaleDateString('de-CH', { month: 'long', year: 'numeric' });
+  let h = `<div class="row" style="margin:12px 0 10px;justify-content:space-between">
+      <button class="btn sm" style="flex:none" data-action="plBack">‹ Admin</button>
+      <div class="chips" style="flex:none">${['Monat', 'Jahr'].map(v => `<button class="chip ${(S.plView || 'Monat') === v ? 'on' : ''}" data-action="plView" data-v="${v}">${v}</button>`).join('')}</div></div>
+    <div class="cal-head"><button class="navbtn" data-action="plPrev" aria-label="Zurück">‹</button><b>${label}</b>
+      <button class="navbtn" data-action="plNext" aria-label="Weiter">›</button></div>`;
+  h += `<div class="pl-wrap">${yearMode ? plYear(y) : plMonth()}</div>`;
+  h += `<div class="pl-legend">
+    <span><i style="background:var(--clinic)"></i>Clinic</span><span><i style="background:var(--verkauf)"></i>Verkauf</span>
+    <span><i style="background:var(--verkauf);opacity:.4"></i>offen</span><span><i style="background:var(--verkauf);box-shadow:inset 0 -3px 0 #5b3cc4"></i>Prio</span>
+    <span><i style="background:var(--holCHbg);border:1px solid var(--holCH)"></i>Feiertag CH</span><span><i style="background:var(--holZHbg);border:1px solid var(--holZH)"></i>Feiertag ZH</span>
+    <span><i style="background:repeating-linear-gradient(135deg,var(--card) 0 3px,var(--blk) 3px 6px);border:1px solid var(--line)"></i>Sperrtag</span>
+    <span><b style="color:var(--danger)">2</b>&nbsp;= mehr weg als erlaubt</span>
+  </div><p class="hint">${yearMode ? 'Zahl = Ferientage in dieser Woche. Tippe auf eine Woche, um den Monat zu öffnen.' : 'Tippe auf einen Balken, um den Wunsch zu sehen, zu genehmigen oder abzulehnen.'}</p>`;
+  return h;
+}
+
+function plMonth() {
+  const y = S.month.getFullYear(), mo = S.month.getMonth(), nd = new Date(y, mo + 1, 0).getDate();
+  const dates = Array.from({ length: nd }, (_, i) => iso(new Date(y, mo, i + 1)));
+  let h = `<table class="pl"><thead><tr><th class="nm"></th>${dates.map(ds => { const hol = holiday(ds);
+    return `<th class="${dayCls(ds)}" title="${hol ? hol.name : ''}"><span>${fmt(ds, { weekday: 'short' }).slice(0, 2)}</span>${+ds.slice(8)}</th>`; }).join('')}</tr></thead><tbody>`;
+  for (const cat of CATS) {
+    const lim = S.limits[cat] || 1;
+    h += `<tr class="grp"><th class="nm">${cat} <small>max ${lim}</small></th>${dates.map(ds => { const n = countOn(ds, cat);
+      return `<td class="${n > lim ? 'over' : n && n === lim ? 'at' : ''}">${n || ''}</td>`; }).join('')}</tr>`;
+    for (const e of plEmployees(cat)) {
+      h += `<tr>${plName(e)}${dates.map(ds => { const r = reqOn(e.id, ds);
+        const bar = r ? `<button class="bar ${cat} ${r.status}${r.is_prio ? ' prio' : ''}${ds === r.start_date || ds.endsWith('-01') ? ' start' : ''}${ds === r.end_date || ds === dates[nd - 1] ? ' end' : ''}"
+          data-action="plReq" data-id="${r.id}" aria-label="${esc(e.name)} ${fmtRange(r.start_date, r.end_date)}"></button>` : '';
+        return `<td class="${dayCls(ds, cat)}">${bar}</td>`; }).join('')}</tr>`;
+    }
+  }
+  return h + '</tbody></table>';
+}
+
+function plYear(y) {
+  // ISO-Kalenderwochen des Jahres (Montag der Woche mit dem 4. Januar = KW 1)
+  const d4 = new Date(y, 0, 4); d4.setDate(4 - ((d4.getDay() + 6) % 7));
+  const weeks = [];
+  for (let mon = iso(d4); +addDays(mon, 3).slice(0, 4) === y; mon = addDays(mon, 7)) weeks.push(mon);
+  const months = [];
+  for (const mon of weeks) { const m = addDays(mon, 3).slice(0, 7); if (months.at(-1)?.m === m) months.at(-1).n++; else months.push({ m, n: 1 }); }
+  let h = `<table class="pl"><thead><tr class="mo"><th class="nm"></th>${months.map(x =>
+    `<th colspan="${x.n}">${parse(x.m + '-01').toLocaleDateString('de-CH', { month: 'short' })}</th>`).join('')}<th></th></tr>
+    <tr><th class="nm"></th>${weeks.map(mon => `<th class="${today() >= mon && today() <= addDays(mon, 6) ? 'tod' : ''}" title="${fmtRange(mon, addDays(mon, 6))}">${isoWeek(parse(mon))}</th>`).join('')}<th>Total</th></tr></thead><tbody>`;
+  for (const cat of CATS) {
+    const lim = S.limits[cat] || 1;
+    h += `<tr class="grp"><th class="nm">${cat} <small>max ${lim}</small></th>${weeks.map(mon => {
+      let n = 0; for (let i = 0; i < 7; i++) n = Math.max(n, countOn(addDays(mon, i), cat));
+      return `<td class="${n > lim ? 'over' : n && n === lim ? 'at' : ''}">${n || ''}</td>`; }).join('')}<td></td></tr>`;
+    for (const e of plEmployees(cat)) {
+      const b = balance(e.id, y);
+      h += `<tr>${plName(e)}${weeks.map(mon => {
+        const rs = S.requests.filter(r => r.employee_id === e.id && r.status !== 'abgelehnt' && overlaps(r, mon, addDays(mon, 6)));
+        if (!rs.length) return '<td></td>';
+        const n = rs.reduce((sum, r) => sum + ft(workDays(r.start_date > mon ? r.start_date : mon, r.end_date < addDays(mon, 6) ? r.end_date : addDays(mon, 6)), e.id), 0);
+        const open = rs.some(r => r.status === 'offen');
+        return `<td><button class="wk ${cat}${open ? ' offen' : ''}" data-action="plWeek" data-d="${addDays(mon, 3)}" title="${fmtRange(mon, addDays(mon, 6))}">${fmtD(n)}</button></td>`;
+      }).join('')}<td class="tot">${fmtD(b.appr + b.open)}${b.total != null ? ` / ${fmtD(b.total)}` : ''}</td></tr>`;
+    }
+  }
+  return h + '</tbody></table>';
+}
+
+function renderPlReqSheet() {
+  const r = S.requests.find(x => x.id === S.plReq);
+  if (!r) return closeSheet();
+  $('sheetBody').innerHTML = `<div class="row" style="justify-content:space-between;margin-bottom:8px"><b style="flex:none">Ferienwunsch</b>
+    <button class="btn sm" style="flex:none" data-action="close">Schliessen</button></div>${adminCard(r)}`;
+}
+
 /* ---------- Sheet (Ferienwunsch) ---------- */
 function openSel(start, end) { S.sel = { start, end: end || start }; render(); $('sheet').classList.add('open'); document.body.classList.add('sheet-open'); }
-function closeSheet() { S.sel = null; $('sheet').classList.remove('open'); document.body.classList.remove('sheet-open'); }
+function closeSheet() { S.sel = null; S.plReq = null; $('sheet').classList.remove('open'); document.body.classList.remove('sheet-open'); }
 
 function renderSheet() {
   if (S.blockMode) return renderBlockSheet();
@@ -592,7 +723,7 @@ async function rpc(fn, args) {
 /* ---------- Events ---------- */
 document.addEventListener('click', async ev => {
   const t = ev.target.closest('[data-action],[data-tab]'); if (!t) return;
-  if (t.dataset.tab) { S.tab = t.dataset.tab; S.blockMode = false; closeSheet(); render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.tab) { S.tab = t.dataset.tab; S.blockMode = false; S.adminView = null; closeSheet(); render(); window.scrollTo(0, 0); return; }
   const a = t.dataset.action, id = Number(t.dataset.id);
   switch (a) {
     case 'pick': S.me = id; localStorage.setItem('fp_me', id); S.tab = 'cal'; render(); break;
@@ -638,6 +769,16 @@ document.addEventListener('click', async ev => {
       if (!data) { toast('Falsche PIN'); break; }
       S.pin = pin; localStorage.setItem('fp_pin', pin); render(); break; }
     case 'logout': S.pin = null; localStorage.removeItem('fp_pin'); render(); break;
+    case 'planner': S.adminView = 'planner'; render(); window.scrollTo(0, 0); break;
+    case 'plBack': S.adminView = null; closeSheet(); render(); window.scrollTo(0, 0); break;
+    case 'plView': S.plView = t.dataset.v; if (S.plView === 'Jahr') S.plYear = S.month.getFullYear(); else if (S.plYear) S.month = new Date(S.plYear, S.plYear === new Date().getFullYear() ? new Date().getMonth() : 0, 1); render(); break;
+    case 'plPrev': case 'plNext': {
+      const dir = a === 'plNext' ? 1 : -1;
+      if (S.plView === 'Jahr') S.plYear = (S.plYear || new Date().getFullYear()) + dir;
+      else S.month = new Date(S.month.getFullYear(), S.month.getMonth() + dir, 1);
+      render(); break; }
+    case 'plWeek': S.plView = 'Monat'; S.month = firstOfMonth(parse(t.dataset.d)); render(); break;
+    case 'plReq': S.sel = null; S.plReq = id; render(); $('sheet').classList.add('open'); document.body.classList.add('sheet-open'); break;
     case 'status': await rpc('admin_set_status', { p_id: id, p_status: t.dataset.s }); break;
     case 'adminDel': if (confirm('Endgültig löschen?')) await rpc('admin_delete_request', { p_id: id }); break;
     case 'saveLimits':
