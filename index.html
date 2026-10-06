@@ -12,12 +12,12 @@
 :root{
   --bg:#f5f3ef; --card:#fff; --ink:#1d2733; --muted:#6b7480; --line:#e6e2db;
   --clinic:#0f9d8a; --verkauf:#e8833a; --accent:#1d2733; --danger:#d64545; --ok:#2e9d5b;
-  --sel:#dfe9ff; --selInk:#2a5bd7; --full:#fde8e8;
+  --sel:#dfe9ff; --selInk:#2a5bd7; --full:#fde8e8; --blk:#e2ddd4;
   --radius:14px;
 }
 @media (prefers-color-scheme:dark){
   :root{--bg:#12171d; --card:#1c232b; --ink:#eef1f4; --muted:#9aa4af; --line:#2c353f;
-    --accent:#eef1f4; --sel:#22345a; --selInk:#8fb0ff; --full:#3a2226;}
+    --accent:#eef1f4; --sel:#22345a; --selInk:#8fb0ff; --full:#3a2226; --blk:#323c47;}
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--ink);
@@ -69,6 +69,11 @@ h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted
 .day.full{background:var(--full)}
 .day.mine{box-shadow:inset 0 -3px 0 var(--selInk)}
 .day.sel{background:var(--sel);border-color:var(--selInk)}
+.day.blocked{background:repeating-linear-gradient(135deg,var(--card) 0 5px,var(--blk) 5px 10px)}
+.day.blocked.sel{background:repeating-linear-gradient(135deg,var(--sel) 0 5px,var(--blk) 5px 10px)}
+.lock{position:absolute;top:2px;right:3px;font-size:8px;line-height:1}
+.banner{display:flex;align-items:center;gap:10px;background:var(--sel);color:var(--selInk);border-radius:12px;padding:10px 12px;margin:4px 0 12px;font-size:14px;font-weight:600}
+.banner span{flex:1}
 .dots{display:flex;flex-wrap:wrap;gap:2px;justify-content:center;max-width:100%}
 .dot{width:7px;height:7px;border-radius:50%}
 .dot.Clinic{background:var(--clinic)} .dot.Verkauf{background:var(--verkauf)}
@@ -155,7 +160,7 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const CATS = ['Clinic', 'Verkauf'];
 const S = {
-  employees: [], limits: {}, requests: [],
+  employees: [], limits: {}, requests: [], blocks: [], blockMode: false,
   me: Number(localStorage.getItem('fp_me')) || null,
   tab: 'cal', filter: 'Alle', teamFilter: 'Alle',
   month: firstOfMonth(new Date()),
@@ -186,6 +191,9 @@ function fmtRange(a, b) {
 }
 function days(r) { return diff(r.start_date, r.end_date) + 1; }
 function overlaps(r, a, b) { return r.start_date <= b && r.end_date >= a; }
+// Sperrtage, die für eine Kategorie gelten (ohne Kategorie = alle Sperrtage)
+function blocksFor(cat) { return S.blocks.filter(b => !cat || !b.category || b.category === cat); }
+function blockLabel(b) { return `${fmtRange(b.start_date, b.end_date)}${b.reason ? ' · ' + esc(b.reason) : ''}`; }
 
 /* ---------- Helpers ---------- */
 const $ = id => document.getElementById(id);
@@ -206,15 +214,17 @@ function statusTag(r) {
 
 /* ---------- Daten ---------- */
 async function load(quiet) {
-  const [e, l, r] = await Promise.all([
+  const [e, l, r, b] = await Promise.all([
     db.from('employees').select('*').order('name'),
     db.from('category_limits').select('*'),
     db.from('requests').select('*').order('start_date'),
+    db.from('blocked_days').select('*').order('start_date'),
   ]);
   if (e.error || l.error || r.error) { toast('Fehler beim Laden – Internet prüfen'); return; }
   S.employees = e.data;
   S.limits = Object.fromEntries(l.data.map(x => [x.category, x.max_parallel]));
   S.requests = r.data;
+  S.blocks = b.data || [];
   if (S.me && !emp(S.me)) { S.me = null; localStorage.removeItem('fp_me'); }
   computeConflicts();
   render(quiet);
@@ -271,11 +281,11 @@ function render(quiet) {
   const open = S.requests.filter(r => r.status === 'offen').length;
   $('adminBadge').textContent = open; $('adminBadge').classList.toggle('hidden', !open || !S.pin);
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === S.tab));
-  if (!me && S.tab !== 'admin') { closeSheet(); $('main').innerHTML = renderWho(); return; }
+  if (!me && S.tab !== 'admin' && !S.blockMode) { closeSheet(); $('main').innerHTML = renderWho(); return; }
   const typing = document.activeElement?.closest?.('#main') && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
   if (quiet && typing) return;   // Live-Update nicht mitten ins Tippen rendern
   const draft = $('newNames')?.value;
-  $('main').innerHTML = (me ? '' : '<button class="btn sm" style="margin-top:4px" data-action="backToWho">‹ Zur Namensauswahl</button>')
+  $('main').innerHTML = (me || S.blockMode ? '' : '<button class="btn sm" style="margin-top:4px" data-action="backToWho">‹ Zur Namensauswahl</button>')
     + { cal: renderCal, mine: renderMine, team: renderTeam, admin: renderAdmin }[S.tab]();
   if (draft && $('newNames')) $('newNames').value = draft;
   if (S.sel) renderSheet();
@@ -296,8 +306,10 @@ function renderCal() {
   const m = S.month, me = emp(S.me);
   const start = new Date(m); start.setDate(1 - ((m.getDay() + 6) % 7));
   const label = m.toLocaleDateString('de-CH', { month: 'long', year: 'numeric' });
-  const lim = S.limits[me.category] || 1;
-  let h = `<div class="cal-head"><button class="navbtn" data-action="prev" aria-label="Vorheriger Monat">‹</button>
+  const lim = me ? S.limits[me.category] || 1 : Infinity;
+  const blocks = blocksFor(S.blockMode ? null : me.category);
+  let h = (S.blockMode ? `<div class="banner"><span>🔒 Sperrtage wählen: Start- und Endtag antippen</span>
+    <button class="btn sm primary" data-action="endBlockMode">Fertig</button></div>` : '') + `<div class="cal-head"><button class="navbtn" data-action="prev" aria-label="Vorheriger Monat">‹</button>
     <b>${label}</b><button class="navbtn" data-action="next" aria-label="Nächster Monat">›</button></div>
     <div class="chips" style="margin-bottom:10px">${['Alle', ...CATS].map(f =>
       `<button class="chip ${S.filter === f ? 'on' : ''}" data-action="filter" data-f="${f}">${f}</button>`).join('')}</div>
@@ -309,22 +321,24 @@ function renderCal() {
     for (let i = 0; i < 7; i++, d.setDate(d.getDate() + 1)) {
       const ds = iso(d);
       const list = (S.dayMap.get(ds) || []).filter(r => S.filter === 'Alle' || emp(r.employee_id).category === S.filter);
-      const sameCatOthers = (S.dayMap.get(ds) || []).filter(r => r.employee_id !== S.me && emp(r.employee_id).category === me.category).length;
+      const sameCatOthers = me ? (S.dayMap.get(ds) || []).filter(r => r.employee_id !== S.me && emp(r.employee_id).category === me.category).length : 0;
+      const blocked = blocks.some(b => ds >= b.start_date && ds <= b.end_date);
       const cls = ['day',
         d.getMonth() !== m.getMonth() && 'out', i > 4 && 'we', ds === today() && 'today',
-        sameCatOthers >= lim && 'full',
+        sameCatOthers >= lim && 'full', blocked && 'blocked',
         (S.dayMap.get(ds) || []).some(r => r.employee_id === S.me) && 'mine',
         S.sel && ds >= S.sel.start && ds <= S.sel.end && 'sel'].filter(Boolean).join(' ');
       const dots = list.slice(0, 6).map(r => `<span class="dot ${emp(r.employee_id).category} ${r.status}"></span>`).join('');
-      h += `<button class="${cls}" data-action="day" data-d="${ds}"><span class="n">${d.getDate()}</span>
+      h += `<button class="${cls}" data-action="day" data-d="${ds}">${blocked ? '<span class="lock">🔒</span>' : ''}<span class="n">${d.getDate()}</span>
         <span class="dots">${dots}</span>${list.length > 6 ? `<span class="more">+${list.length - 6}</span>` : ''}</button>`;
     }
   }
   h += `</div><div class="legend">
     <span><i class="dot Clinic"></i>Clinic</span><span><i class="dot Verkauf"></i>Verkauf</span>
     <span><i class="dot offen Clinic"></i>offen</span>
-    <span><i style="width:14px;height:10px;border-radius:3px;background:var(--full);display:inline-block"></i>${me.category} voll</span>
-  </div><p class="hint">Tippe auf einen Tag, dann auf den letzten Ferientag.<br>Tippe auf die KW-Nummer für eine ganze Woche.</p>`;
+    ${me ? `<span><i style="width:14px;height:10px;border-radius:3px;background:var(--full);display:inline-block"></i>${me.category} voll</span>` : ''}
+    <span><i style="width:14px;height:10px;border-radius:3px;background:repeating-linear-gradient(135deg,var(--card) 0 3px,var(--blk) 3px 6px);display:inline-block;border:1px solid var(--line)"></i>Sperrtag</span>
+  </div><p class="hint">Tippe auf einen Tag, dann auf den letzten ${S.blockMode ? 'Sperrtag' : 'Ferientag'}.<br>Tippe auf die KW-Nummer für eine ganze Woche.</p>`;
   return h;
 }
 
@@ -385,6 +399,18 @@ function renderAdmin() {
       </div></div>`;
   };
   let h = `<h2>Offene Wünsche (${open.length})</h2>` + (open.length ? open.map(card).join('') : '<div class="card empty">Alles erledigt 👍</div>');
+  const upcoming = S.blocks.filter(b => b.end_date >= today());
+  h += `<h2>Sperrtage</h2><div class="card">
+    <button class="btn primary block" data-action="blockMode">📅 Im Kalender auswählen</button>
+    <p class="small muted" style="margin:12px 0 6px">oder direkt eingeben:</p>
+    <div class="row"><div><label class="f">Von</label><input type="date" id="blFrom"></div><div><label class="f">Bis</label><input type="date" id="blTo"></div></div>
+    <div class="row" style="margin-top:8px"><select id="blCat" style="flex:none;width:40%">${['', ...CATS].map(c => `<option value="${c}">${c || 'Alle'}</option>`).join('')}</select>
+      <input type="text" id="blReason" placeholder="Grund (optional)" maxlength="100"></div>
+    <div class="actions"><button class="btn sm" data-action="addBlockForm">Sperren</button></div>
+    ${upcoming.length ? '<ul class="away" style="margin-top:12px">' + upcoming.map(b => `<li><span style="flex:1">🔒 ${blockLabel(b)}<br>
+      <span class="small muted">${b.category || 'Alle'}</span></span><button class="btn sm danger" data-action="delBlock" data-id="${b.id}">Löschen</button></li>`).join('') + '</ul>'
+      : '<p class="small muted" style="margin-top:12px">Keine Sperrtage geplant.</p>'}
+  </div>`;
   h += `<h2>Limit gleichzeitig abwesend</h2><div class="card"><div class="row">` + CATS.map(c =>
     `<div><label class="f">${c}</label><input type="number" min="1" max="20" id="lim-${c}" value="${S.limits[c] || 1}"></div>`).join('') +
     `</div><div class="actions"><button class="btn sm primary" data-action="saveLimits">Speichern</button></div></div>`;
@@ -409,7 +435,9 @@ function openSel(start, end) { S.sel = { start, end: end || start }; render(); $
 function closeSheet() { S.sel = null; $('sheet').classList.remove('open'); document.body.classList.remove('sheet-open'); }
 
 function renderSheet() {
+  if (S.blockMode) return renderBlockSheet();
   const { start, end } = S.sel, me = emp(S.me), n = diff(start, end) + 1;
+  const blockedHit = blocksFor(me.category).filter(b => overlaps(b, start, end));
   const year = start.slice(0, 4);
   const lim = S.limits[me.category] || 1;
   const away = S.requests.filter(r => r.status !== 'abgelehnt' && r.employee_id !== S.me && overlaps(r, start, end));
@@ -430,25 +458,49 @@ function renderSheet() {
       <div><label class="f">Bis</label><input type="date" id="fTo" value="${end}"></div>
     </div>
     ${start === end ? '<p class="small muted" style="margin:8px 0 0">Tippe im Kalender auf den letzten Ferientag.</p>' : ''}
+    ${blockedHit.length ? `<div class="warn">🔒 <b>Gesperrt</b> – in diesem Zeitraum können keine Ferien eingetragen werden:<br>${blockedHit.map(blockLabel).join('<br>')}</div>` : ''}
     ${fullDays ? `<div class="warn">⚠️ An ${fullDays} Tag${fullDays > 1 ? 'en' : ''} sind schon ${lim} von ${me.category} weg (Limit ${lim}). ${prioOk ? 'Mit der Prio-Woche hast du Vorrang vor normalen Wünschen.' : 'Dein Wunsch kommt auf die Warteliste.'}</div>` : ''}
     <label class="prio-box"><input type="checkbox" id="prio" ${prioOk ? '' : 'disabled'} ${prioOk && prev ? 'checked' : ''}>
       <span><b>Als Prio-Woche markieren</b><br><span class="small muted">${prioHint}</span></span></label>
     <input type="text" id="fNote" placeholder="Bemerkung (optional)" maxlength="200" value="${esc(prevNote)}">
-    <div class="actions"><button class="btn primary block" data-action="submit">Ferienwunsch senden</button></div>
+    <div class="actions"><button class="btn primary block" data-action="submit" ${blockedHit.length ? 'disabled' : ''}>Ferienwunsch senden</button></div>
     <h2 style="margin-top:16px">In diesem Zeitraum weg (${away.length})</h2>
     ${away.length ? `<ul class="away">${away.map(r => { const e = emp(r.employee_id);
       return `<li>${avatar(e)}<span style="flex:1">${esc(e.name)}<br><span class="small muted">${fmtRange(r.start_date, r.end_date)}</span></span>${statusTag(r)}</li>`; }).join('')}</ul>`
       : '<p class="small muted">Niemand – freie Bahn.</p>'}`;
 }
 
+function renderBlockSheet() {
+  const { start, end } = S.sel, n = diff(start, end) + 1;
+  const cat = $('bCat')?.value ?? S.lastBlockCat ?? '', reason = $('bReason')?.value || '';
+  const hit = S.requests.filter(r => r.status !== 'abgelehnt' && overlaps(r, start, end) && (!cat || emp(r.employee_id)?.category === cat));
+  $('sheetBody').innerHTML = `
+    <div class="row" style="justify-content:space-between"><b style="flex:none">🔒 Sperren · ${n} Tag${n > 1 ? 'e' : ''}</b>
+      <button class="btn sm" style="flex:none" data-action="close">Schliessen</button></div>
+    <div class="row" style="margin-top:10px">
+      <div><label class="f">Von</label><input type="date" id="fFrom" value="${start}"></div>
+      <div><label class="f">Bis</label><input type="date" id="fTo" value="${end}"></div>
+    </div>
+    ${start === end ? '<p class="small muted" style="margin:8px 0 0">Tippe im Kalender auf den letzten Sperrtag.</p>' : ''}
+    <div class="row" style="margin-top:10px">
+      <div style="flex:none;width:40%"><label class="f">Gilt für</label><select id="bCat">${['', ...CATS].map(c => `<option value="${c}" ${c === cat ? 'selected' : ''}>${c || 'Alle'}</option>`).join('')}</select></div>
+      <div><label class="f">Grund (optional)</label><input type="text" id="bReason" placeholder="z.B. Inventur" maxlength="100" value="${esc(reason)}"></div>
+    </div>
+    ${hit.length ? `<div class="warn">⚠️ ${hit.length} bestehende${hit.length > 1 ? '' : 'r'} Wunsch${hit.length > 1 ? 'e' : ''} in diesem Zeitraum (bleib${hit.length > 1 ? 'en' : 't'} bestehen, ggf. ablehnen):<br>
+      ${hit.map(r => `${esc(emp(r.employee_id)?.name)} – ${fmtRange(r.start_date, r.end_date)} (${r.status})`).join('<br>')}</div>` : ''}
+    <div class="actions"><button class="btn primary block" data-action="saveBlock">Sperren</button></div>`;
+}
+
 async function submit() {
   const start = $('fFrom').value, end = $('fTo').value, is_prio = $('prio').checked, note = $('fNote').value.trim() || null;
   if (!start || !end || end < start) return toast('Bitte gültige Daten wählen');
   if (start < today()) return toast('Ferien in der Vergangenheit geht nicht');
+  if (blocksFor(emp(S.me).category).some(b => overlaps(b, start, end))) return toast('Dieser Zeitraum ist gesperrt');
   if (S.requests.some(r => r.employee_id === S.me && r.status !== 'abgelehnt' && overlaps(r, start, end)))
     return toast('Du hast in diesem Zeitraum schon einen Wunsch');
   const { error } = await db.from('requests').insert({ employee_id: S.me, start_date: start, end_date: end, is_prio, note });
-  if (error) return toast(error.code === '23505' ? 'Du hast für dieses Jahr schon eine Prio-Woche' : 'Fehler: ' + error.message);
+  if (error) return toast(error.code === '23505' ? 'Du hast für dieses Jahr schon eine Prio-Woche'
+    : error.message.startsWith('Gesperrt') ? error.message : 'Fehler: ' + error.message);
   closeSheet(); toast('Ferienwunsch gesendet ✓'); await load();
 }
 
@@ -463,7 +515,7 @@ async function rpc(fn, args) {
 /* ---------- Events ---------- */
 document.addEventListener('click', async ev => {
   const t = ev.target.closest('[data-action],[data-tab]'); if (!t) return;
-  if (t.dataset.tab) { S.tab = t.dataset.tab; closeSheet(); render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.tab) { S.tab = t.dataset.tab; S.blockMode = false; closeSheet(); render(); window.scrollTo(0, 0); return; }
   const a = t.dataset.action, id = Number(t.dataset.id);
   switch (a) {
     case 'pick': S.me = id; localStorage.setItem('fp_me', id); S.tab = 'cal'; render(); break;
@@ -482,6 +534,22 @@ document.addEventListener('click', async ev => {
       break; }
     case 'week': { const mon = t.dataset.d; openSel(mon, addDays(mon, 6)); break; }
     case 'close': closeSheet(); render(); break;
+    case 'blockMode': S.blockMode = true; S.tab = 'cal'; closeSheet(); render(); window.scrollTo(0, 0); break;
+    case 'endBlockMode': S.blockMode = false; S.tab = 'admin'; closeSheet(); render(); window.scrollTo(0, 0); break;
+    case 'saveBlock': {
+      const a = $('fFrom').value, b = $('fTo').value;
+      if (!a || !b || b < a) return toast('Bitte gültige Daten wählen');
+      S.lastBlockCat = $('bCat').value;
+      if (await rpc('admin_add_block', { p_start: a, p_end: b, p_category: S.lastBlockCat, p_reason: $('bReason').value })) {
+        closeSheet(); render(); toast('Gesperrt 🔒');
+      }
+      break; }
+    case 'addBlockForm': {
+      const a = $('blFrom').value, b = $('blTo').value || a;
+      if (!a || b < a) return toast('Bitte gültige Daten wählen');
+      if (await rpc('admin_add_block', { p_start: a, p_end: b, p_category: $('blCat').value, p_reason: $('blReason').value })) toast('Gesperrt 🔒');
+      break; }
+    case 'delBlock': if (confirm('Sperrtage wieder freigeben?')) await rpc('admin_delete_block', { p_id: id }); break;
     case 'submit': t.disabled = true; await submit(); t.disabled = false; break;
     case 'delMine': {
       if (!confirm('Diesen Ferienwunsch zurückziehen?')) break;
@@ -524,6 +592,7 @@ document.addEventListener('click', async ev => {
 });
 
 document.addEventListener('change', ev => {
+  if (S.sel && ev.target.id === 'bCat') return renderSheet();
   if (!S.sel || !['fFrom', 'fTo'].includes(ev.target.id)) return;
   let a = $('fFrom').value, b = $('fTo').value;
   if (!a) return; if (!b || b < a) b = a;
