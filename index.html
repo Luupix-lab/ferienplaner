@@ -204,7 +204,12 @@ function workDays(a, b) {
   for (let d = a; d <= b; d = addDays(d, 1)) { const w = parse(d).getDay(); if (w > 0 && w < 6 && !holiday(d)) n++; }
   return n;
 }
-function wd(r) { return workDays(r.start_date, r.end_date); }
+// Bei Teilzeit zählt jeder Arbeitstag nur anteilig (80 % → 0.8 Tage, eine Woche = 4 Tage)
+const FULL_DAYS = 25;   // Ferientage bei 100 %
+function pensum(empId) { return emp(empId)?.pensum ?? 100; }
+function ft(n, empId) { return Math.round(n * pensum(empId) / 10) / 10; }
+function fmtD(n) { return (Math.round(n * 10) / 10).toLocaleString('de-CH'); }
+function wd(r) { return ft(workDays(r.start_date, r.end_date), r.employee_id); }
 // Ferientage eines Zeitraums, die ins Jahr y fallen
 function daysInYear(a, b, y) { const ya = `${y}-01-01`, yb = `${y}-12-31`; return a > yb || b < ya ? 0 : workDays(a < ya ? ya : a, b > yb ? yb : b); }
 // Guthaben pro Jahr: genehmigt + offen werden abgezogen, abgelehnt nicht
@@ -213,10 +218,10 @@ function balance(empId, y) {
   for (const r of S.requests) {
     if (r.employee_id !== empId || r.status === 'abgelehnt') continue;
     const n = daysInYear(r.start_date, r.end_date, y);
-    if (r.status === 'genehmigt') appr += n; else open += n;
+    if (r.status === 'genehmigt') appr += ft(n, empId); else open += ft(n, empId);
   }
-  const total = emp(empId)?.vacation_days ?? null;
-  return { total, appr, open, left: total == null ? null : total - appr - open };
+  const total = emp(empId)?.vacation_days == null ? null : Number(emp(empId).vacation_days);
+  return { total, appr, open, left: total == null ? null : Math.round((total - appr - open) * 10) / 10 };
 }
 function yearsOf(a, b) { const out = []; for (let y = +a.slice(0, 4); y <= +b.slice(0, 4); y++) out.push(y); return out; }
 function overlaps(r, a, b) { return r.start_date <= b && r.end_date >= a; }
@@ -406,13 +411,13 @@ function renderMine() {
   let h = `<h2>Übersicht</h2><div class="card small">
     ${years.map(yy => { const b = balance(S.me, yy);
       return `<div style="margin-bottom:6px">Ferientage ${yy}: ${b.total == null ? '<span class="muted">Guthaben nicht hinterlegt</span>'
-        : b.left < 0 ? `<b style="color:var(--danger)">überzogen um ${-b.left}</b> (Guthaben ${b.total})` : `<b>${b.left} übrig</b> von ${b.total}`}<br>
-        <span class="muted">${b.appr} genehmigt · ${b.open} beantragt</span></div>`; }).join('')}
+        : b.left < 0 ? `<b style="color:var(--danger)">überzogen um ${fmtD(-b.left)}</b> (Guthaben ${fmtD(b.total)})` : `<b>${fmtD(b.left)} übrig</b> von ${fmtD(b.total)}`}<br>
+        <span class="muted">${fmtD(b.appr)} genehmigt · ${fmtD(b.open)} beantragt${pensum(S.me) < 100 ? ` · Pensum ${pensum(S.me)} %` : ''}</span></div>`; }).join('')}
     <div>Prio-Woche: ${prios.length ? prios.map(p => `<b>KW ${isoWeek(parse(p.start_date))}/${p.start_date.slice(0, 4)}</b>`).join(', ') : '<span class="muted">noch keine gewählt</span>'}</div>
   </div><h2>Meine Wünsche</h2>`;
   if (!mine.length) return h + `<div class="card empty">Noch nichts eingetragen.<br><br><button class="btn primary" data-tab="cal">Im Kalender eintragen</button></div>`;
   return h + mine.map(r => `<div class="card"><div class="title">${fmtRange(r.start_date, r.end_date)}</div>
-    <div class="small muted">${wd(r)} Ferientage · KW ${isoWeek(parse(r.start_date))} ${statusTag(r)}</div>
+    <div class="small muted">${fmtD(wd(r))} Ferientage · KW ${isoWeek(parse(r.start_date))} ${statusTag(r)}</div>
     ${r.note ? `<div class="small" style="margin-top:6px">${esc(r.note)}</div>` : ''}
     ${conflictText(r)}
     ${r.status === 'offen' ? `<div class="actions"><button class="btn sm danger" data-action="delMine" data-id="${r.id}">Zurückziehen</button></div>` : ''}
@@ -432,7 +437,7 @@ function renderTeam() {
     if (mo !== cur) { if (cur) h += '</div>'; h += `<h2>${mo}</h2><div class="card">`; cur = mo; }
     const e = emp(r.employee_id);
     h += `<div class="item" style="padding:6px 0">${avatar(e)}<div class="body"><div class="title">${esc(e.name)}</div>
-      <div class="small muted">${fmtRange(r.start_date, r.end_date)} · ${wd(r)} Ferientage ${statusTag(r)}</div></div></div>`;
+      <div class="small muted">${fmtRange(r.start_date, r.end_date)} · ${fmtD(wd(r))} Ferientage ${statusTag(r)}</div></div></div>`;
   }
   return h + '</div>';
 }
@@ -446,10 +451,10 @@ function renderAdmin() {
   const card = r => {
     const e = emp(r.employee_id);
     return `<div class="card"><div class="item">${avatar(e)}<div class="body">
-      <div class="title">${esc(e.name)} <span class="small muted">${e.category}</span></div>
-      <div class="small muted">${fmtRange(r.start_date, r.end_date)} · ${wd(r)} Ferientage ${statusTag(r)}</div>
+      <div class="title">${esc(e.name)} <span class="small muted">${e.category}${e.pensum < 100 ? ` · ${e.pensum} %` : ''}</span></div>
+      <div class="small muted">${fmtRange(r.start_date, r.end_date)} · ${fmtD(wd(r))} Ferientage ${statusTag(r)}</div>
       ${yearsOf(r.start_date, r.end_date).map(y => { const b = balance(e.id, y); return b.total == null ? '' :
-        `<div class="small" style="margin-top:4px;${b.left < 0 ? 'color:var(--danger);font-weight:600' : ''}">Guthaben ${y}: ${b.left < 0 ? `überzogen um ${-b.left}` : `${b.left} übrig`} von ${b.total} (inkl. offene)</div>`; }).join('')}
+        `<div class="small" style="margin-top:4px;${b.left < 0 ? 'color:var(--danger);font-weight:600' : ''}">Guthaben ${y}: ${b.left < 0 ? `überzogen um ${fmtD(-b.left)}` : `${fmtD(b.left)} übrig`} von ${fmtD(b.total)} (inkl. offene)</div>`; }).join('')}
       ${r.note ? `<div class="small" style="margin-top:4px">${esc(r.note)}</div>` : ''}</div></div>
       ${conflictText(r)}
       <div class="actions">
@@ -478,15 +483,18 @@ function renderAdmin() {
   h += `<h2>Mitarbeiter (${S.employees.length})</h2><div class="card"><label class="f">Neue Mitarbeiter – ein Name pro Zeile</label>
       <textarea id="newNames" rows="4" placeholder="Anna Muster&#10;Ben Beispiel"></textarea>
       <div class="row" style="margin-top:8px"><select id="newCat">${CATS.map(c => `<option ${c === S.lastCat ? 'selected' : ''}>${c}</option>`).join('')}</select>
-      <input type="number" id="newDays" min="0" max="366" inputmode="numeric" placeholder="Ferientage/Jahr" value="${S.lastDays ?? ''}"></div>
+      </div><div class="row" style="margin-top:8px">
+      <div><label class="f">Pensum %</label><input type="number" id="newPensum" min="10" max="100" inputmode="numeric" value="${S.lastPensum ?? 100}"></div>
+      <div><label class="f">Ferientage/Jahr</label><input type="number" id="newDays" min="0" max="366" step="0.5" inputmode="decimal" value="${S.lastDays ?? FULL_DAYS * (S.lastPensum ?? 100) / 100}"></div></div>
       <div class="actions"><button class="btn sm primary block" data-action="addEmp">Hinzufügen</button></div></div>
     <div class="card">` + S.employees.map(e => `<div class="row" style="flex-wrap:wrap;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line)">
       <input type="text" id="en-${e.id}" value="${esc(e.name)}" style="flex:1 1 100%">
       <select id="ec-${e.id}">${CATS.map(c => `<option ${c === e.category ? 'selected' : ''}>${c}</option>`).join('')}</select>
       <select id="ea-${e.id}"><option value="1" ${e.active ? 'selected' : ''}>aktiv</option><option value="0" ${e.active ? '' : 'selected'}>inaktiv</option></select>
-      <div style="flex:1 1 100%;display:flex;align-items:center;gap:8px"><span class="small muted">Ferientage/Jahr</span>
-      <input type="number" id="ed-${e.id}" min="0" max="366" inputmode="numeric" value="${e.vacation_days ?? ''}" style="width:80px;flex:none">
-      <button class="btn sm" style="flex:none;margin-left:auto" data-action="saveEmp" data-id="${e.id}">Speichern</button></div></div>`).join('') + `</div>`;
+      <div class="row" style="flex:1 1 100%">
+        <div><label class="f">Pensum %</label><input type="number" id="ep-${e.id}" min="10" max="100" inputmode="numeric" value="${e.pensum ?? 100}"></div>
+        <div><label class="f">Ferientage/Jahr</label><input type="number" id="ed-${e.id}" min="0" max="366" step="0.5" inputmode="decimal" value="${e.vacation_days ?? ''}"></div>
+        <button class="btn sm" style="flex:none;align-self:flex-end;min-height:44px" data-action="saveEmp" data-id="${e.id}">Speichern</button></div></div>`).join('') + `</div>`;
   h += `<h2>Bearbeitet (zukünftig)</h2>` + (done.length ? done.map(card).join('') : '<div class="card empty">–</div>');
   h += `<h2>Einstellungen</h2><div class="card"><label class="f">Neue Admin-PIN</label>
     <div class="row"><input type="password" inputmode="numeric" id="newPin" autocomplete="new-password"><button class="btn sm" style="flex:none" data-action="changePin">Ändern</button></div>
@@ -515,7 +523,7 @@ function renderSheet() {
     : 'Einmal pro Jahr. Hat Vorrang vor normalen Wünschen, wenn zu viele gleichzeitig weg wollen.';
   const prev = $('prio')?.checked, prevNote = $('fNote')?.value || '';
   $('sheetBody').innerHTML = `
-    <div class="row" style="justify-content:space-between"><b style="flex:none">Ferien · ${workDays(start, end)} Ferientag${workDays(start, end) === 1 ? '' : 'e'}</b>
+    <div class="row" style="justify-content:space-between"><b style="flex:none">Ferien · ${fmtD(ft(workDays(start, end), S.me))} Ferientag${ft(workDays(start, end), S.me) === 1 ? '' : 'e'}</b>
       <button class="btn sm" style="flex:none" data-action="close">Schliessen</button></div>
     <div class="row" style="margin-top:10px">
       <div><label class="f">Von</label><input type="date" id="fFrom" value="${start}"></div>
@@ -525,9 +533,9 @@ function renderSheet() {
     ${(() => { const hs = holidaysIn(start, end); return hs.length ? `<p class="small muted" style="margin:10px 0 0">Feiertage in diesem Zeitraum:</p>${holList(hs)}` : ''; })()}
     ${blockedHit.length ? `<div class="warn">🔒 <b>Gesperrt</b> – in diesem Zeitraum können keine Ferien eingetragen werden:<br>${blockedHit.map(blockLabel).join('<br>')}</div>` : ''}
     ${yearsOf(start, end).map(y => { const b = balance(S.me, y); if (b.total == null) return '';
-      const after = b.left - daysInYear(start, end, y);
-      return after < 0 ? `<div class="warn">⚠️ Damit überziehst du dein Guthaben ${y} um <b>${-after} Tag${after === -1 ? '' : 'e'}</b> (${b.total} Tage/Jahr). Senden geht trotzdem – der Admin entscheidet.</div>`
-        : `<p class="small muted" style="margin:10px 0 0">Danach übrig ${y}: <b>${after}</b> von ${b.total} Ferientagen</p>`; }).join('')}
+      const after = Math.round((b.left - ft(daysInYear(start, end, y), S.me)) * 10) / 10;
+      return after < 0 ? `<div class="warn">⚠️ Damit überziehst du dein Guthaben ${y} um <b>${fmtD(-after)} Tag${after === -1 ? '' : 'e'}</b> (${fmtD(b.total)} Tage/Jahr). Senden geht trotzdem – der Admin entscheidet.</div>`
+        : `<p class="small muted" style="margin:10px 0 0">Danach übrig ${y}: <b>${fmtD(after)}</b> von ${fmtD(b.total)} Ferientagen</p>`; }).join('')}
     ${fullDays ? `<div class="warn">⚠️ An ${fullDays} Tag${fullDays > 1 ? 'en' : ''} sind schon ${lim} von ${me.category} weg (Limit ${lim}). ${prioOk ? 'Mit der Prio-Woche hast du Vorrang vor normalen Wünschen.' : 'Dein Wunsch kommt auf die Warteliste.'}</div>` : ''}
     <label class="prio-box"><input type="checkbox" id="prio" ${prioOk ? '' : 'disabled'} ${prioOk && prev ? 'checked' : ''}>
       <span><b>Als Prio-Woche markieren</b><br><span class="small muted">${prioHint}</span></span></label>
@@ -637,15 +645,17 @@ document.addEventListener('click', async ev => {
       toast('Limits gespeichert'); break;
     case 'saveEmp':
       if (await rpc('admin_save_employee', { p_id: id, p_name: $('en-' + id).value, p_category: $('ec-' + id).value, p_active: $('ea-' + id).value === '1',
-        p_days: $('ed-' + id).value === '' ? null : Number($('ed-' + id).value) })) toast('Gespeichert');
+        p_days: $('ed-' + id).value === '' ? null : Number($('ed-' + id).value),
+        p_pensum: Math.min(100, Math.max(10, Number($('ep-' + id).value) || 100)) })) toast('Gespeichert');
       break;
     case 'addEmp': {
       const names = [...new Set($('newNames').value.split('\n').map(n => n.trim()).filter(Boolean))];
       if (!names.length) return toast('Bitte mindestens einen Namen eingeben');
       S.lastCat = $('newCat').value; S.lastDays = $('newDays').value === '' ? null : Number($('newDays').value);
+      S.lastPensum = Math.min(100, Math.max(10, Number($('newPensum').value) || 100));
       const failed = [];
       for (const name of names) {
-        const { error } = await db.rpc('admin_save_employee', { p_pin: S.pin, p_id: null, p_name: name, p_category: S.lastCat, p_active: true, p_days: S.lastDays });
+        const { error } = await db.rpc('admin_save_employee', { p_pin: S.pin, p_id: null, p_name: name, p_category: S.lastCat, p_active: true, p_days: S.lastDays, p_pensum: S.lastPensum });
         if (error?.message.includes('PIN')) { S.pin = null; localStorage.removeItem('fp_pin'); render(); return toast('PIN ungültig – bitte neu anmelden'); }
         if (error) failed.push(name + (error.code === '23505' ? ' (gibt es schon)' : ''));
       }
@@ -663,6 +673,12 @@ document.addEventListener('click', async ev => {
 
 document.addEventListener('change', ev => {
   if (S.sel && ev.target.id === 'bCat') return renderSheet();
+  const pm = ev.target.id.match(/^(ep-(\d+)|newPensum)$/);
+  if (pm && ev.target.value) {
+    const days = Math.round(FULL_DAYS * Number(ev.target.value) / 100 * 2) / 2;   // auf halbe Tage
+    $(pm[2] ? 'ed-' + pm[2] : 'newDays').value = days;
+    return;
+  }
   if (!S.sel || !['fFrom', 'fTo'].includes(ev.target.id)) return;
   let a = $('fFrom').value, b = $('fTo').value;
   if (!a) return; if (!b || b < a) b = a;
