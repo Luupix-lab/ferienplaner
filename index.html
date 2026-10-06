@@ -13,11 +13,13 @@
   --bg:#f5f3ef; --card:#fff; --ink:#1d2733; --muted:#6b7480; --line:#e6e2db;
   --clinic:#0f9d8a; --verkauf:#e8833a; --accent:#1d2733; --danger:#d64545; --ok:#2e9d5b;
   --sel:#dfe9ff; --selInk:#2a5bd7; --full:#fde8e8; --blk:#e2ddd4;
+  --holCH:#d52b1e; --holCHbg:#fdecea; --holZH:#0f5fa8; --holZHbg:#e3eefa;
   --radius:14px;
 }
 @media (prefers-color-scheme:dark){
   :root{--bg:#12171d; --card:#1c232b; --ink:#eef1f4; --muted:#9aa4af; --line:#2c353f;
-    --accent:#eef1f4; --sel:#22345a; --selInk:#8fb0ff; --full:#3a2226; --blk:#323c47;}
+    --accent:#eef1f4; --sel:#22345a; --selInk:#8fb0ff; --full:#3a2226; --blk:#323c47;
+    --holCH:#ff7b70; --holCHbg:#3a2224; --holZH:#7db7f0; --holZHbg:#1d2c3d;}
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--ink);
@@ -65,6 +67,12 @@ h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted
 .day .n{font-size:13px;font-weight:600;line-height:1}
 .day.out{opacity:.4}
 .day.we .n{color:var(--muted)}
+.day.hol-CH{background:var(--holCHbg)} .day.hol-CH .n{color:var(--holCH)}
+.day.hol-ZH{background:var(--holZHbg)} .day.hol-ZH .n{color:var(--holZH)}
+.hol-list{font-size:13px;margin:4px 4px 0;padding:0;list-style:none}
+.hol-list li{display:flex;gap:8px;align-items:center;padding:3px 0}
+.hol-dot{width:10px;height:10px;border-radius:3px;flex:none}
+.hol-dot.CH{background:var(--holCH)} .hol-dot.ZH{background:var(--holZH)}
 .day.today .n{background:var(--ink);color:var(--bg);border-radius:999px;padding:3px 5px;margin-top:-2px}
 .day.full{background:var(--full)}
 .day.mine{box-shadow:inset 0 -3px 0 var(--selInk)}
@@ -191,6 +199,29 @@ function fmtRange(a, b) {
 }
 function days(r) { return diff(r.start_date, r.end_date) + 1; }
 function overlaps(r, a, b) { return r.start_date <= b && r.end_date >= a; }
+// Feiertage Kanton Zürich. CH = in der ganzen Schweiz, ZH = Kanton Zürich
+function easter(y) {
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25),
+    g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4,
+    l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451), n = h + l - 7 * m + 114;
+  return iso(new Date(y, Math.floor(n / 31) - 1, (n % 31) + 1));
+}
+const holCache = {};
+function holidays(y) {
+  if (holCache[y]) return holCache[y];
+  const e = easter(y);
+  const list = [[`${y}-01-01`, 'Neujahr', 'CH'], [`${y}-01-02`, 'Berchtoldstag', 'ZH'], [addDays(e, -2), 'Karfreitag', 'ZH'],
+    [addDays(e, 1), 'Ostermontag', 'ZH'], [`${y}-05-01`, 'Tag der Arbeit', 'ZH'], [addDays(e, 39), 'Auffahrt', 'CH'],
+    [addDays(e, 50), 'Pfingstmontag', 'ZH'], [`${y}-08-01`, 'Bundesfeiertag', 'CH'], [`${y}-12-25`, 'Weihnachten', 'CH'],
+    [`${y}-12-26`, 'Stephanstag', 'ZH']];
+  return holCache[y] = Object.fromEntries(list.map(([d, name, type]) => [d, { d, name, type }]));
+}
+function holiday(ds) { return holidays(+ds.slice(0, 4))[ds]; }
+function holidaysIn(a, b) { const out = []; for (let d = a; d <= b; d = addDays(d, 1)) { const h = holiday(d); if (h) out.push(h); } return out; }
+function holList(list) {
+  return `<ul class="hol-list">${list.map(h => `<li><i class="hol-dot ${h.type}"></i>${fmt(h.d)} · ${h.name}</li>`).join('')}</ul>`;
+}
+
 // Sperrtage, die für eine Kategorie gelten (ohne Kategorie = alle Sperrtage)
 function blocksFor(cat) { return S.blocks.filter(b => !cat || !b.category || b.category === cat); }
 function blockLabel(b) { return `${fmtRange(b.start_date, b.end_date)}${b.reason ? ' · ' + esc(b.reason) : ''}`; }
@@ -323,13 +354,14 @@ function renderCal() {
       const list = (S.dayMap.get(ds) || []).filter(r => S.filter === 'Alle' || emp(r.employee_id).category === S.filter);
       const sameCatOthers = me ? (S.dayMap.get(ds) || []).filter(r => r.employee_id !== S.me && emp(r.employee_id).category === me.category).length : 0;
       const blocked = blocks.some(b => ds >= b.start_date && ds <= b.end_date);
+      const hol = holiday(ds);
       const cls = ['day',
-        d.getMonth() !== m.getMonth() && 'out', i > 4 && 'we', ds === today() && 'today',
+        d.getMonth() !== m.getMonth() && 'out', i > 4 && 'we', hol && 'hol-' + hol.type, ds === today() && 'today',
         sameCatOthers >= lim && 'full', blocked && 'blocked',
         (S.dayMap.get(ds) || []).some(r => r.employee_id === S.me) && 'mine',
         S.sel && ds >= S.sel.start && ds <= S.sel.end && 'sel'].filter(Boolean).join(' ');
       const dots = list.slice(0, 6).map(r => `<span class="dot ${emp(r.employee_id).category} ${r.status}"></span>`).join('');
-      h += `<button class="${cls}" data-action="day" data-d="${ds}">${blocked ? '<span class="lock">🔒</span>' : ''}<span class="n">${d.getDate()}</span>
+      h += `<button class="${cls}" data-action="day" data-d="${ds}"${hol ? ` title="${hol.name}"` : ''}>${blocked ? '<span class="lock">🔒</span>' : ''}<span class="n">${d.getDate()}</span>
         <span class="dots">${dots}</span>${list.length > 6 ? `<span class="more">+${list.length - 6}</span>` : ''}</button>`;
     }
   }
@@ -337,8 +369,11 @@ function renderCal() {
     <span><i class="dot Clinic"></i>Clinic</span><span><i class="dot Verkauf"></i>Verkauf</span>
     <span><i class="dot offen Clinic"></i>offen</span>
     ${me ? `<span><i style="width:14px;height:10px;border-radius:3px;background:var(--full);display:inline-block"></i>${me.category} voll</span>` : ''}
+    <span><i class="hol-dot CH"></i>Feiertag CH</span><span><i class="hol-dot ZH"></i>Feiertag ZH</span>
     <span><i style="width:14px;height:10px;border-radius:3px;background:repeating-linear-gradient(135deg,var(--card) 0 3px,var(--blk) 3px 6px);display:inline-block;border:1px solid var(--line)"></i>Sperrtag</span>
-  </div><p class="hint">Tippe auf einen Tag, dann auf den letzten ${S.blockMode ? 'Sperrtag' : 'Ferientag'}.<br>Tippe auf die KW-Nummer für eine ganze Woche.</p>`;
+  </div>${(() => { const ms = iso(m).slice(0, 7), list = Object.values(holidays(m.getFullYear())).filter(h => h.d.startsWith(ms)).sort((a, b) => a.d.localeCompare(b.d));
+    return list.length ? `<h2 style="margin-top:4px">Feiertage im ${m.toLocaleDateString('de-CH', { month: 'long' })}</h2>${holList(list)}` : ''; })()}
+  <p class="hint">Tippe auf einen Tag, dann auf den letzten ${S.blockMode ? 'Sperrtag' : 'Ferientag'}.<br>Tippe auf die KW-Nummer für eine ganze Woche.</p>`;
   return h;
 }
 
@@ -458,6 +493,7 @@ function renderSheet() {
       <div><label class="f">Bis</label><input type="date" id="fTo" value="${end}"></div>
     </div>
     ${start === end ? '<p class="small muted" style="margin:8px 0 0">Tippe im Kalender auf den letzten Ferientag.</p>' : ''}
+    ${(() => { const hs = holidaysIn(start, end); return hs.length ? `<p class="small muted" style="margin:10px 0 0">Feiertage in diesem Zeitraum:</p>${holList(hs)}` : ''; })()}
     ${blockedHit.length ? `<div class="warn">🔒 <b>Gesperrt</b> – in diesem Zeitraum können keine Ferien eingetragen werden:<br>${blockedHit.map(blockLabel).join('<br>')}</div>` : ''}
     ${fullDays ? `<div class="warn">⚠️ An ${fullDays} Tag${fullDays > 1 ? 'en' : ''} sind schon ${lim} von ${me.category} weg (Limit ${lim}). ${prioOk ? 'Mit der Prio-Woche hast du Vorrang vor normalen Wünschen.' : 'Dein Wunsch kommt auf die Warteliste.'}</div>` : ''}
     <label class="prio-box"><input type="checkbox" id="prio" ${prioOk ? '' : 'disabled'} ${prioOk && prev ? 'checked' : ''}>
