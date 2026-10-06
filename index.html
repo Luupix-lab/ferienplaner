@@ -13,13 +13,13 @@
   --bg:#f5f3ef; --card:#fff; --ink:#1d2733; --muted:#6b7480; --line:#e6e2db;
   --clinic:#0f9d8a; --verkauf:#e8833a; --accent:#1d2733; --danger:#d64545; --ok:#2e9d5b;
   --sel:#dfe9ff; --selInk:#2a5bd7; --full:#fde8e8; --blk:#e2ddd4;
-  --holCH:#d52b1e; --holCHbg:#fdecea; --holZH:#0f5fa8; --holZHbg:#e3eefa; --pruef:#c2417a;
+  --holCH:#d52b1e; --holCHbg:#fdecea; --holZH:#0f5fa8; --holZHbg:#e3eefa; --pruef:#c2417a; --mil:#5b6b2f;
   --radius:14px;
 }
 @media (prefers-color-scheme:dark){
   :root{--bg:#12171d; --card:#1c232b; --ink:#eef1f4; --muted:#9aa4af; --line:#2c353f;
     --accent:#eef1f4; --sel:#22345a; --selInk:#8fb0ff; --full:#3a2226; --blk:#323c47;
-    --holCH:#ff7b70; --holCHbg:#3a2224; --holZH:#7db7f0; --holZHbg:#1d2c3d; --pruef:#e46aa0;}
+    --holCH:#ff7b70; --holCHbg:#3a2224; --holZH:#7db7f0; --holZHbg:#1d2c3d; --pruef:#e46aa0; --mil:#a3b86c;}
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--ink);
@@ -48,10 +48,10 @@ h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted
 .chip.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
 .tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;margin-left:4px;vertical-align:1px}
 .t-offen{background:#fff2d6;color:#8a5a00} .t-genehmigt{background:#dcf3e5;color:#1d6b3e} .t-abgelehnt{background:#fbe0e0;color:#9b2c2c}
-.t-prio{background:#ece4ff;color:#5b3cc4} .t-konflikt{background:#fbe0e0;color:#9b2c2c} .t-pruef{background:#fbe3ef;color:#a3245e}
+.t-prio{background:#ece4ff;color:#5b3cc4} .t-konflikt{background:#fbe0e0;color:#9b2c2c} .t-pruef{background:#fbe3ef;color:#a3245e} .t-mil{background:#e8eddc;color:#4b5d23}
 @media (prefers-color-scheme:dark){
   .t-offen{background:#3d3218;color:#f3cf7a} .t-genehmigt{background:#183526;color:#7fdca3}
-  .t-abgelehnt,.t-konflikt{background:#3d1d1d;color:#f19a9a} .t-prio{background:#2b2350;color:#b9a6ff} .t-pruef{background:#3d1a2b;color:#f29cc4}
+  .t-abgelehnt,.t-konflikt{background:#3d1d1d;color:#f19a9a} .t-prio{background:#2b2350;color:#b9a6ff} .t-pruef{background:#3d1a2b;color:#f29cc4} .t-mil{background:#262d18;color:#b7c98a}
 }
 
 /* Kalender */
@@ -86,8 +86,8 @@ h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted
 .dot{width:7px;height:7px;border-radius:50%}
 .dot.Clinic{background:var(--clinic)} .dot.Verkauf{background:var(--verkauf)}
 .dot.offen{background:transparent!important;border:1.5px solid}
-.dot.pruef{background:var(--pruef)}
-.dot.offen.Clinic{border-color:var(--clinic)} .dot.offen.Verkauf{border-color:var(--verkauf)} .dot.offen.pruef{border-color:var(--pruef)}
+.dot.pruef{background:var(--pruef)} .dot.mil{background:var(--mil)}
+.dot.offen.Clinic{border-color:var(--clinic)} .dot.offen.Verkauf{border-color:var(--verkauf)} .dot.offen.pruef{border-color:var(--pruef)} .dot.offen.mil{border-color:var(--mil)}
 .more{font-size:9px;color:var(--muted);line-height:7px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:12px 4px}
 .legend span{display:inline-flex;align-items:center;gap:5px}
@@ -170,11 +170,11 @@ table.pl{border-collapse:separate;border-spacing:0;font-size:11px;min-width:100%
 .bar.Clinic{background:var(--clinic)} .bar.Verkauf{background:var(--verkauf)}
 .bar.offen{opacity:.4}
 .bar.prio{box-shadow:inset 0 -4px 0 #5b3cc4}
-.bar.pruef,.wk.pruef{background:var(--pruef)}
+.bar.pruef,.wk.pruef{background:var(--pruef)} .bar.mil,.wk.mil{background:var(--mil)}
 .bar.start{border-radius:5px 0 0 5px} .bar.end{border-radius:0 5px 5px 0} .bar.start.end{border-radius:5px}
 .wk{display:block;width:calc(100% - 4px);margin:0 2px;height:20px;border-radius:4px;border:none;padding:0;color:#fff;font-weight:700;font-size:11px;line-height:20px}
 .wk.Clinic{background:var(--clinic)} .wk.Verkauf{background:var(--verkauf)}
-.wk.offen{background:transparent;border:2px solid;line-height:16px} .wk.offen.pruef{border-color:var(--pruef)!important;color:var(--pruef)!important;background:transparent} .wk.offen.Clinic{border-color:var(--clinic);color:var(--clinic)} .wk.offen.Verkauf{border-color:var(--verkauf);color:var(--verkauf)}
+.wk.offen{background:transparent;border:2px solid;line-height:16px} .wk.offen.pruef{border-color:var(--pruef)!important;color:var(--pruef)!important;background:transparent} .wk.offen.mil{border-color:var(--mil)!important;color:var(--mil)!important;background:transparent} .wk.offen.Clinic{border-color:var(--clinic);color:var(--clinic)} .wk.offen.Verkauf{border-color:var(--verkauf);color:var(--verkauf)}
 .pl-legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);margin:10px 4px}
 .pl-legend span{display:inline-flex;align-items:center;gap:5px}
 .pl-legend i{display:inline-block;width:16px;height:10px;border-radius:3px}
@@ -253,7 +253,7 @@ function daysInYear(a, b, y) { const ya = `${y}-01-01`, yb = `${y}-12-31`; retur
 function balance(empId, y) {
   let appr = 0, open = 0;
   for (const r of S.requests) {
-    if (r.employee_id !== empId || r.status === 'abgelehnt') continue;
+    if (r.employee_id !== empId || r.status === 'abgelehnt' || r.kind !== 'ferien') continue;
     const n = daysInYear(r.start_date, r.end_date, y);
     if (r.status === 'genehmigt') appr += ft(n, empId); else open += ft(n, empId);
   }
@@ -300,9 +300,17 @@ function toast(msg) {
   const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
   document.body.appendChild(t); setTimeout(() => { t.style.opacity = 0; setTimeout(() => t.remove(), 250); }, 2600);
 }
-function dayLabel(r) { return emp(r.employee_id)?.hourly ? `${workDays(r.start_date, r.end_date)} Arbeitstage` : fmtD(wd(r)) + ' Ferientage'; }
+// Abwesenheitsarten: Ferien (alle), Prüfungsphase (nur Stundenlöhner), WK (alle)
+const KINDS = { ferien: { label: 'Ferien', chip: '🌴 Ferien', cls: '' }, pruefung: { label: 'Prüfungsphase', chip: '📚 Prüfungsphase', cls: ' pruef' },
+  wk: { label: 'WK', chip: '🎖️ WK', cls: ' mil' } };
+function kindsFor(e) { return e?.hourly ? ['pruefung', 'ferien', 'wk'] : ['ferien', 'wk']; }
+function curKind(e) { const ks = kindsFor(e); return ks.includes(S.kind) ? S.kind : ks[0]; }
+function kindCls(r) { return KINDS[r.kind]?.cls || ''; }
+// Zum Limit zählen nur Ferien von Festangestellten
+function limited(r) { return r.kind === 'ferien' && !emp(r.employee_id)?.hourly; }
+function dayLabel(r) { return emp(r.employee_id)?.hourly || r.kind !== 'ferien' ? `${workDays(r.start_date, r.end_date)} Arbeitstage` : fmtD(wd(r)) + ' Ferientage'; }
 function statusTag(r) {
-  let h = r.kind === 'pruefung' ? '<span class="tag t-pruef">Prüfung</span>' : '';
+  let h = r.kind === 'pruefung' ? '<span class="tag t-pruef">Prüfung</span>' : r.kind === 'wk' ? '<span class="tag t-mil">WK</span>' : '';
   h += r.is_prio ? '<span class="tag t-prio">Prio</span>' : '';
   h += `<span class="tag t-${r.status}">${r.status}</span>`;
   if (r.status !== 'abgelehnt' && S.conflicts.has(r.id)) h += '<span class="tag t-konflikt">Konflikt</span>';
@@ -345,7 +353,7 @@ function computeConflicts() {
       S.dayMap.get(d).push(r);
       const k = d + '|' + e.category;
       if (!perCat.has(k)) perCat.set(k, []);
-      if (!e.hourly) perCat.get(k).push(r);
+      if (limited(r)) perCat.get(k).push(r);
     }
   }
   for (const [k, list] of perCat) {
@@ -419,7 +427,7 @@ function renderCal() {
     for (let i = 0; i < 7; i++, d.setDate(d.getDate() + 1)) {
       const ds = iso(d);
       const list = (S.dayMap.get(ds) || []).filter(r => S.filter === 'Alle' || emp(r.employee_id).category === S.filter);
-      const sameCatOthers = me ? (S.dayMap.get(ds) || []).filter(r => r.employee_id !== S.me && emp(r.employee_id).category === me.category && !emp(r.employee_id).hourly).length : 0;
+      const sameCatOthers = me ? (S.dayMap.get(ds) || []).filter(r => r.employee_id !== S.me && emp(r.employee_id).category === me.category && limited(r)).length : 0;
       const blocked = blocks.some(b => ds >= b.start_date && ds <= b.end_date);
       const hol = holiday(ds);
       const cls = ['day',
@@ -427,7 +435,7 @@ function renderCal() {
         sameCatOthers >= lim && 'full', blocked && 'blocked',
         (S.dayMap.get(ds) || []).some(r => r.employee_id === S.me) && 'mine',
         S.sel && ds >= S.sel.start && ds <= S.sel.end && 'sel'].filter(Boolean).join(' ');
-      const dots = list.slice(0, 6).map(r => `<span class="dot ${emp(r.employee_id).category} ${r.status}${r.kind === 'pruefung' ? ' pruef' : ''}"></span>`).join('');
+      const dots = list.slice(0, 6).map(r => `<span class="dot ${emp(r.employee_id).category} ${r.status}${kindCls(r)}"></span>`).join('');
       h += `<button class="${cls}" data-action="day" data-d="${ds}"${hol ? ` title="${hol.name}"` : ''}>${blocked ? '<span class="lock">🔒</span>' : ''}<span class="n">${d.getDate()}</span>
         <span class="dots">${dots}</span>${list.length > 6 ? `<span class="more">+${list.length - 6}</span>` : ''}</button>`;
     }
@@ -436,7 +444,7 @@ function renderCal() {
     <span><i class="dot Clinic"></i>Clinic</span><span><i class="dot Verkauf"></i>Verkauf</span>
     <span><i class="dot offen Clinic"></i>offen</span>
     ${me && !me.hourly ? `<span><i style="width:14px;height:10px;border-radius:3px;background:var(--full);display:inline-block"></i>${me.category} voll</span>` : ''}
-    <span><i class="dot pruef"></i>Prüfung</span>
+    <span><i class="dot mil"></i>WK</span>${me?.hourly ? '<span><i class="dot pruef"></i>Prüfung</span>' : ''}
     <span><i class="hol-dot CH"></i>Feiertag CH</span><span><i class="hol-dot ZH"></i>Feiertag ZH</span>
     <span><i style="width:14px;height:10px;border-radius:3px;background:repeating-linear-gradient(135deg,var(--card) 0 3px,var(--blk) 3px 6px);display:inline-block;border:1px solid var(--line)"></i>Sperrtag</span>
   </div>${(() => { const ms = iso(m).slice(0, 7), list = Object.values(holidays(m.getFullYear())).filter(h => h.d.startsWith(ms)).sort((a, b) => a.d.localeCompare(b.d));
@@ -449,9 +457,9 @@ function renderMine() {
   const mine = S.requests.filter(r => r.employee_id === S.me);
   const y = new Date().getFullYear();
   const prios = mine.filter(r => r.is_prio && r.status !== 'abgelehnt');
-  const years = [...new Set([y, ...mine.filter(r => r.status !== 'abgelehnt').flatMap(r => yearsOf(r.start_date, r.end_date))])].filter(x => x >= y).sort();
+  const years = [...new Set([y, ...mine.filter(r => r.status !== 'abgelehnt' && r.kind === 'ferien').flatMap(r => yearsOf(r.start_date, r.end_date))])].filter(x => x >= y).sort();
   if (emp(S.me).hourly) return renderMineList(mine, `<h2>Übersicht</h2><div class="card small">Du bist im <b>Stundenlohn</b>: Ferien werden über den Lohn entschädigt.
-    Trage hier deine <b>Prüfungsphasen</b> und <b>Ferien</b> ein – der Admin bestätigt sie.</div><h2>Meine Einträge</h2>`);
+    Trage hier deine <b>Prüfungsphasen</b>, <b>Ferien</b> und einen <b>WK</b> ein – der Admin bestätigt sie.</div><h2>Meine Einträge</h2>`);
   let h = `<h2>Übersicht</h2><div class="card small">
     ${years.map(yy => { const b = balance(S.me, yy);
       return `<div style="margin-bottom:6px">Ferientage ${yy}: ${b.total == null ? '<span class="muted">Guthaben nicht hinterlegt</span>'
@@ -511,7 +519,7 @@ function adminCard(r) {
     return `<div class="card"><div class="item">${avatar(e)}<div class="body">
       <div class="title">${esc(e.name)} <span class="small muted">${e.category}${e.hourly ? ' · Stundenlohn' : e.pensum < 100 ? ` · ${e.pensum} %` : ''}</span></div>
       <div class="small muted">${fmtRange(r.start_date, r.end_date)} · ${dayLabel(r)} ${statusTag(r)}</div>
-      ${yearsOf(r.start_date, r.end_date).map(y => { const b = balance(e.id, y); return b.total == null ? '' :
+      ${yearsOf(r.start_date, r.end_date).map(y => { const b = balance(e.id, y); return b.total == null || r.kind !== 'ferien' ? '' :
         `<div class="small" style="margin-top:4px;${b.left < 0 ? 'color:var(--danger);font-weight:600' : ''}">Guthaben ${y}: ${b.left < 0 ? `überzogen um ${fmtD(-b.left)}` : `${fmtD(b.left)} übrig`} von ${fmtD(b.total)} (inkl. offene)</div>`; }).join('')}
       ${r.note ? `<div class="small" style="margin-top:4px">${esc(r.note)}</div>` : ''}</div></div>
       ${conflictText(r)}
@@ -567,7 +575,7 @@ function renderAdminRest(done, card) {
 
 /* ---------- Admin-Planer ---------- */
 function reqOn(eid, ds) { return S.requests.find(r => r.employee_id === eid && r.status !== 'abgelehnt' && ds >= r.start_date && ds <= r.end_date); }
-function countOn(ds, cat) { return (S.dayMap.get(ds) || []).filter(r => emp(r.employee_id)?.category === cat && !emp(r.employee_id).hourly).length; }
+function countOn(ds, cat) { return (S.dayMap.get(ds) || []).filter(r => emp(r.employee_id)?.category === cat && limited(r)).length; }
 function blockedFor(ds, cat) { return blocksFor(cat).some(b => ds >= b.start_date && ds <= b.end_date); }
 function dayCls(ds, cat) {
   const w = parse(ds).getDay(), h = holiday(ds);
@@ -589,7 +597,7 @@ function renderPlanner(admin = true) {
   h += `<div class="pl-wrap">${yearMode ? plYear(y, admin) : plMonth(admin)}</div>`;
   h += `<div class="pl-legend">
     <span><i style="background:var(--clinic)"></i>Clinic</span><span><i style="background:var(--verkauf)"></i>Verkauf</span>
-    <span><i style="background:var(--verkauf);opacity:.4"></i>offen</span><span><i style="background:var(--verkauf);box-shadow:inset 0 -3px 0 #5b3cc4"></i>Prio</span><span><i style="background:var(--pruef)"></i>Prüfung (Std.)</span>
+    <span><i style="background:var(--verkauf);opacity:.4"></i>offen</span><span><i style="background:var(--verkauf);box-shadow:inset 0 -3px 0 #5b3cc4"></i>Prio</span><span><i style="background:var(--pruef)"></i>Prüfung (Std.)</span><span><i style="background:var(--mil)"></i>WK</span>
     <span><i style="background:var(--holCHbg);border:1px solid var(--holCH)"></i>Feiertag CH</span><span><i style="background:var(--holZHbg);border:1px solid var(--holZH)"></i>Feiertag ZH</span>
     <span><i style="background:repeating-linear-gradient(135deg,var(--card) 0 3px,var(--blk) 3px 6px);border:1px solid var(--line)"></i>Sperrtag</span>
     <span><b style="color:var(--danger)">2</b>&nbsp;= mehr weg als erlaubt</span>
@@ -608,7 +616,7 @@ function plMonth(admin) {
       return `<td class="${n > lim ? 'over' : n && n === lim ? 'at' : ''}">${n || ''}</td>`; }).join('')}</tr>`;
     for (const e of plEmployees(cat)) {
       h += `<tr>${plName(e, admin)}${dates.map(ds => { const r = reqOn(e.id, ds);
-        const bar = r ? `<button class="bar ${cat} ${r.status}${r.is_prio ? ' prio' : ''}${r.kind === 'pruefung' ? ' pruef' : ''}${ds === r.start_date || ds.endsWith('-01') ? ' start' : ''}${ds === r.end_date || ds === dates[nd - 1] ? ' end' : ''}"
+        const bar = r ? `<button class="bar ${cat} ${r.status}${r.is_prio ? ' prio' : ''}${kindCls(r)}${ds === r.start_date || ds.endsWith('-01') ? ' start' : ''}${ds === r.end_date || ds === dates[nd - 1] ? ' end' : ''}"
           data-action="plReq" data-id="${r.id}" aria-label="${esc(e.name)} ${fmtRange(r.start_date, r.end_date)}"></button>` : '';
         return `<td class="${dayCls(ds, cat)}">${bar}</td>`; }).join('')}</tr>`;
     }
@@ -638,8 +646,9 @@ function plYear(y, admin) {
         if (!rs.length) return '<td></td>';
         const n = rs.reduce((sum, r) => { const k = workDays(r.start_date > mon ? r.start_date : mon, r.end_date < addDays(mon, 6) ? r.end_date : addDays(mon, 6));
           return sum + (admin ? ft(k, e.id) : k); }, 0);
-        const open = rs.some(r => r.status === 'offen'), pruef = rs.every(r => r.kind === 'pruefung');
-        return `<td><button class="wk ${cat}${open ? ' offen' : ''}${pruef ? ' pruef' : ''}" data-action="plWeek" data-d="${addDays(mon, 3)}" title="${fmtRange(mon, addDays(mon, 6))}">${fmtD(n)}</button></td>`;
+        const open = rs.some(r => r.status === 'offen'), kinds = new Set(rs.map(r => r.kind));
+        const kc = kinds.size === 1 ? KINDS[[...kinds][0]]?.cls || '' : '';   // Farbe nur, wenn die Woche nur eine Art enthält
+        return `<td><button class="wk ${cat}${open ? ' offen' : ''}${kc}" data-action="plWeek" data-d="${addDays(mon, 3)}" title="${fmtRange(mon, addDays(mon, 6))}">${fmtD(n)}</button></td>`;
       }).join('')}${admin ? `<td class="tot">${fmtD(b.appr + b.open)}${b.total != null ? ` / ${fmtD(b.total)}` : ''}</td>` : ''}</tr>`;
     }
   }
@@ -649,7 +658,7 @@ function plYear(y, admin) {
 function renderPlReqSheet() {
   const r = S.requests.find(x => x.id === S.plReq);
   if (!r) return closeSheet();
-  $('sheetBody').innerHTML = `<div class="row" style="justify-content:space-between;margin-bottom:8px"><b style="flex:none">${r.kind === 'pruefung' ? 'Prüfungsphase' : 'Ferienwunsch'}</b>
+  $('sheetBody').innerHTML = `<div class="row" style="justify-content:space-between;margin-bottom:8px"><b style="flex:none">${r.kind === 'ferien' ? 'Ferienwunsch' : KINDS[r.kind].label}</b>
     <button class="btn sm" style="flex:none" data-action="close">Schliessen</button></div>${S.tab === 'admin' ? adminCard(r) : teamCard(r)}`;
 }
 
@@ -667,15 +676,15 @@ function closeSheet() { S.sel = null; S.plReq = null; $('sheet').classList.remov
 function renderSheet() {
   if (S.blockMode) return renderBlockSheet();
   const { start, end } = S.sel, me = emp(S.me), n = diff(start, end) + 1;
-  // Stundenlöhner: Prüfungsphase oder Ferien, kein Guthaben, keine Prio, zählen nicht zum Limit
-  const hourly = !!me.hourly, isPruef = hourly && (S.kind || 'pruefung') === 'pruefung';
-  const blockedHit = isPruef ? [] : blocksFor(me.category).filter(b => overlaps(b, start, end));
+  // Guthaben, Prio, Limit und Sperrtage betreffen nur Ferien; Stundenlöhner haben kein Guthaben/Prio/Limit
+  const hourly = !!me.hourly, kind = curKind(me), isFerien = kind === 'ferien';
+  const blockedHit = isFerien ? blocksFor(me.category).filter(b => overlaps(b, start, end)) : [];
   const year = start.slice(0, 4);
   const lim = S.limits[me.category] || 1;
   const away = S.requests.filter(r => r.status !== 'abgelehnt' && r.employee_id !== S.me && overlaps(r, start, end));
   let fullDays = 0;
   for (let d = start; d <= end; d = addDays(d, 1))
-    if (!hourly && (S.dayMap.get(d) || []).filter(r => r.employee_id !== S.me && emp(r.employee_id).category === me.category && !emp(r.employee_id).hourly).length >= lim) fullDays++;
+    if (!hourly && isFerien && (S.dayMap.get(d) || []).filter(r => r.employee_id !== S.me && emp(r.employee_id).category === me.category && limited(r)).length >= lim) fullDays++;
   const prioUsed = S.requests.find(r => r.employee_id === S.me && r.is_prio && r.status !== 'abgelehnt' && r.start_date.startsWith(year));
   const prioOk = !prioUsed && n <= 7;
   const prioHint = prioUsed ? `Deine Prio-Woche ${year} ist schon vergeben (KW ${isoWeek(parse(prioUsed.start_date))}).`
@@ -683,12 +692,13 @@ function renderSheet() {
     : 'Einmal pro Jahr. Hat Vorrang vor normalen Wünschen, wenn zu viele gleichzeitig weg wollen.';
   const prev = $('prio')?.checked, prevNote = $('fNote')?.value || '';
   $('sheetBody').innerHTML = `
-    <div class="row" style="justify-content:space-between"><b style="flex:none">${hourly
-      ? `${isPruef ? 'Prüfungsphase' : 'Ferien'} · ${workDays(start, end)} Arbeitstag${workDays(start, end) === 1 ? '' : 'e'}`
+    <div class="row" style="justify-content:space-between"><b style="flex:none">${hourly || !isFerien
+      ? `${KINDS[kind].label} · ${workDays(start, end)} Arbeitstag${workDays(start, end) === 1 ? '' : 'e'}`
       : `Ferien · ${fmtD(ft(workDays(start, end), S.me))} Ferientag${ft(workDays(start, end), S.me) === 1 ? '' : 'e'}`}</b>
       <button class="btn sm" style="flex:none" data-action="close">Schliessen</button></div>
-    ${hourly ? `<div class="chips" style="margin-top:10px">${[['pruefung', '📚 Prüfungsphase'], ['ferien', '🌴 Ferien']].map(([k, l]) =>
-      `<button class="chip ${(S.kind || 'pruefung') === k ? 'on' : ''}" data-action="kind" data-k="${k}">${l}</button>`).join('')}</div>` : ''}
+    <div class="chips" style="margin-top:10px">${kindsFor(me).map(k =>
+      `<button class="chip ${kind === k ? 'on' : ''}" data-action="kind" data-k="${k}">${KINDS[k].chip}</button>`).join('')}</div>
+    ${kind === 'wk' ? '<p class="small muted" style="margin:8px 0 0">Ein WK zieht keine Ferientage ab und zählt nicht zum Limit.</p>' : ''}
     <div class="row" style="margin-top:10px">
       <div><label class="f">Von</label><input type="date" id="fFrom" value="${start}"></div>
       <div><label class="f">Bis</label><input type="date" id="fTo" value="${end}"></div>
@@ -696,15 +706,15 @@ function renderSheet() {
     ${start === end ? '<p class="small muted" style="margin:8px 0 0">Tippe im Kalender auf den letzten Tag.</p>' : ''}
     ${(() => { const hs = holidaysIn(start, end); return hs.length ? `<p class="small muted" style="margin:10px 0 0">Feiertage in diesem Zeitraum:</p>${holList(hs)}` : ''; })()}
     ${blockedHit.length ? `<div class="warn">🔒 <b>Gesperrt</b> – in diesem Zeitraum können keine Ferien eingetragen werden:<br>${blockedHit.map(blockLabel).join('<br>')}</div>` : ''}
-    ${yearsOf(start, end).map(y => { const b = balance(S.me, y); if (b.total == null) return '';
+    ${yearsOf(start, end).map(y => { const b = balance(S.me, y); if (b.total == null || !isFerien) return '';
       const after = Math.round((b.left - ft(daysInYear(start, end, y), S.me)) * 10) / 10;
       return after < 0 ? `<div class="warn">⚠️ Damit überziehst du dein Guthaben ${y} um <b>${fmtD(-after)} Tag${after === -1 ? '' : 'e'}</b> (${fmtD(b.total)} Tage/Jahr). Senden geht trotzdem – der Admin entscheidet.</div>`
         : `<p class="small muted" style="margin:10px 0 0">Danach übrig ${y}: <b>${fmtD(after)}</b> von ${fmtD(b.total)} Ferientagen</p>`; }).join('')}
     ${fullDays ? `<div class="warn">⚠️ An ${fullDays} Tag${fullDays > 1 ? 'en' : ''} sind schon ${lim} von ${me.category} weg (Limit ${lim}). ${prioOk ? 'Mit der Prio-Woche hast du Vorrang vor normalen Wünschen.' : 'Dein Wunsch kommt auf die Warteliste.'}</div>` : ''}
-    ${hourly ? '' : `<label class="prio-box"><input type="checkbox" id="prio" ${prioOk ? '' : 'disabled'} ${prioOk && prev ? 'checked' : ''}>
+    ${hourly || !isFerien ? '' : `<label class="prio-box"><input type="checkbox" id="prio" ${prioOk ? '' : 'disabled'} ${prioOk && prev ? 'checked' : ''}>
       <span><b>Als Prio-Woche markieren</b><br><span class="small muted">${prioHint}</span></span></label>`}
     <input type="text" id="fNote" placeholder="Bemerkung (optional)" maxlength="200" value="${esc(prevNote)}">
-    <div class="actions"><button class="btn primary block" data-action="submit" ${blockedHit.length ? 'disabled' : ''}>${isPruef ? 'Prüfungsphase melden' : 'Ferienwunsch senden'}</button></div>
+    <div class="actions"><button class="btn primary block" data-action="submit" ${blockedHit.length ? 'disabled' : ''}>${isFerien ? 'Ferienwunsch senden' : KINDS[kind].label + ' melden'}</button></div>
     <h2 style="margin-top:16px">In diesem Zeitraum weg (${away.length})</h2>
     ${away.length ? `<ul class="away">${away.map(r => { const e = emp(r.employee_id);
       return `<li>${avatar(e)}<span style="flex:1">${esc(e.name)}<br><span class="small muted">${fmtRange(r.start_date, r.end_date)}</span></span>${statusTag(r)}</li>`; }).join('')}</ul>`
@@ -734,7 +744,7 @@ function renderBlockSheet() {
 
 async function submit() {
   const start = $('fFrom').value, end = $('fTo').value, is_prio = !!$('prio')?.checked, note = $('fNote').value.trim() || null;
-  const kind = emp(S.me).hourly ? S.kind || 'pruefung' : 'ferien';
+  const kind = curKind(emp(S.me));
   if (!start || !end || end < start) return toast('Bitte gültige Daten wählen');
   if (start < today()) return toast('Ferien in der Vergangenheit geht nicht');
   if (kind === 'ferien' && blocksFor(emp(S.me).category).some(b => overlaps(b, start, end))) return toast('Dieser Zeitraum ist gesperrt');
@@ -742,8 +752,8 @@ async function submit() {
     return toast('Du hast in diesem Zeitraum schon einen Eintrag');
   const { error } = await db.from('requests').insert({ employee_id: S.me, start_date: start, end_date: end, is_prio, note, kind });
   if (error) return toast(error.code === '23505' ? 'Du hast für dieses Jahr schon eine Prio-Woche'
-    : /^(Gesperrt|Stundenl|Prüfung)/.test(error.message) ? error.message : 'Fehler: ' + error.message);
-  closeSheet(); toast(kind === 'pruefung' ? 'Prüfungsphase gemeldet ✓' : 'Ferienwunsch gesendet ✓'); await load();
+    : /^(Gesperrt|Stundenl|Prüfung|Prio gilt)/.test(error.message) ? error.message : 'Fehler: ' + error.message);
+  closeSheet(); toast(kind === 'ferien' ? 'Ferienwunsch gesendet ✓' : KINDS[kind].label + ' gemeldet ✓'); await load();
 }
 
 /* ---------- Admin ---------- */
