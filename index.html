@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="de-CH">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1d2733">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ferien">
+<title>Ferienplaner</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --bg:#f5f3ef; --card:#fff; --ink:#1d2733; --muted:#6b7480; --line:#e6e2db;
+  --clinic:#0f9d8a; --verkauf:#e8833a; --accent:#1d2733; --danger:#d64545; --ok:#2e9d5b;
+  --sel:#dfe9ff; --selInk:#2a5bd7; --full:#fde8e8;
+  --radius:14px;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#12171d; --card:#1c232b; --ink:#eef1f4; --muted:#9aa4af; --line:#2c353f;
+    --accent:#eef1f4; --sel:#22345a; --selInk:#8fb0ff; --full:#3a2226;}
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);
+  font:15px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+.hidden{display:none!important}
+
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(env(safe-area-inset-top) + 12px) 16px 8px;
+  display:flex;align-items:center;justify-content:space-between;gap:12px}
+header h1{font-size:20px;margin:0;letter-spacing:-.3px}
+.me{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--card);
+  border-radius:999px;padding:4px 12px 4px 4px;font-size:14px}
+main{padding:0 16px calc(90px + env(safe-area-inset-bottom));max-width:640px;margin:0 auto}
+body.sheet-open main{padding-bottom:58vh}
+
+.avatar{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:700;flex:none}
+.c-Clinic{background:var(--clinic)} .c-Verkauf{background:var(--verkauf)}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:12px}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:20px 4px 8px;font-weight:600}
+.muted{color:var(--muted)} .small{font-size:13px}
+
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 12px;font-size:13px}
+.chip.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;margin-left:4px;vertical-align:1px}
+.t-offen{background:#fff2d6;color:#8a5a00} .t-genehmigt{background:#dcf3e5;color:#1d6b3e} .t-abgelehnt{background:#fbe0e0;color:#9b2c2c}
+.t-prio{background:#ece4ff;color:#5b3cc4} .t-konflikt{background:#fbe0e0;color:#9b2c2c}
+@media (prefers-color-scheme:dark){
+  .t-offen{background:#3d3218;color:#f3cf7a} .t-genehmigt{background:#183526;color:#7fdca3}
+  .t-abgelehnt,.t-konflikt{background:#3d1d1d;color:#f19a9a} .t-prio{background:#2b2350;color:#b9a6ff}
+}
+
+/* Kalender */
+.cal-head{display:flex;align-items:center;justify-content:space-between;margin:4px 0 10px}
+.cal-head b{font-size:18px}
+.navbtn{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--card);font-size:18px}
+.grid{display:grid;grid-template-columns:28px repeat(7,1fr);gap:3px}
+.dow{font-size:11px;color:var(--muted);text-align:center;padding:4px 0;font-weight:600}
+.kw{font-size:10px;color:var(--muted);display:grid;place-items:center;border-radius:8px;border:none;background:none;padding:0}
+.kw:active{background:var(--sel)}
+.day{position:relative;min-height:54px;border-radius:10px;background:var(--card);border:1px solid var(--line);
+  padding:4px 3px 3px;display:flex;flex-direction:column;align-items:center;gap:3px}
+.day .n{font-size:13px;font-weight:600;line-height:1}
+.day.out{opacity:.4}
+.day.we .n{color:var(--muted)}
+.day.today .n{background:var(--ink);color:var(--bg);border-radius:999px;padding:3px 5px;margin-top:-2px}
+.day.full{background:var(--full)}
+.day.mine{box-shadow:inset 0 -3px 0 var(--selInk)}
+.day.sel{background:var(--sel);border-color:var(--selInk)}
+.dots{display:flex;flex-wrap:wrap;gap:2px;justify-content:center;max-width:100%}
+.dot{width:7px;height:7px;border-radius:50%}
+.dot.Clinic{background:var(--clinic)} .dot.Verkauf{background:var(--verkauf)}
+.dot.offen{background:transparent!important;border:1.5px solid}
+.dot.offen.Clinic{border-color:var(--clinic)} .dot.offen.Verkauf{border-color:var(--verkauf)}
+.more{font-size:9px;color:var(--muted);line-height:7px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:12px 4px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.hint{font-size:13px;color:var(--muted);text-align:center;margin:12px 0}
+
+/* Sheet */
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--card);border-top:1px solid var(--line);
+  border-radius:20px 20px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.12);max-height:56vh;overflow:auto;
+  padding:10px 16px calc(16px + env(safe-area-inset-bottom));transform:translateY(105%);visibility:hidden;transition:transform .25s ease,visibility .25s}
+.sheet.open{transform:none;visibility:visible}
+.grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 10px}
+.sheet-inner{max-width:640px;margin:0 auto}
+.row{display:flex;gap:10px;align-items:center}
+.row > *{flex:1}
+label.f{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+input[type=date],input[type=text],input[type=number],input[type=password],select,textarea{
+  width:100%;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:10px 12px;min-height:44px}
+textarea{min-height:44px;resize:vertical}
+.btn{border:none;border-radius:12px;padding:12px 16px;font-weight:600;min-height:46px;background:var(--line);color:var(--ink)}
+.btn.primary{background:var(--accent);color:var(--bg)}
+.btn.ok{background:var(--ok);color:#fff} .btn.danger{background:transparent;color:var(--danger);border:1px solid var(--danger)}
+.btn.block{width:100%}
+.btn.sm{min-height:36px;padding:7px 12px;font-size:13px;border-radius:10px}
+.btn:disabled{opacity:.45}
+.warn{background:var(--full);border-radius:10px;padding:10px 12px;font-size:13px;margin:10px 0}
+.prio-box{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
+.prio-box input{width:22px;height:22px;margin:0;accent-color:#5b3cc4;flex:none}
+.away{list-style:none;margin:6px 0 0;padding:0}
+.away li{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+.away li:last-child{border:none}
+
+/* Listen */
+.item{display:flex;gap:12px;align-items:flex-start}
+.item .body{flex:1;min-width:0}
+.item .title{font-weight:600}
+.actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+
+/* Bottom-Nav */
+nav{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--card);border-top:1px solid var(--line);
+  display:flex;justify-content:space-around;padding:6px 0 calc(6px + env(safe-area-inset-bottom))}
+nav button{border:none;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;
+  font-size:11px;color:var(--muted);padding:4px 12px;min-width:64px}
+nav button svg{width:24px;height:24px}
+nav button.on{color:var(--ink);font-weight:600}
+.badge{position:absolute;margin-left:18px;margin-top:-4px;background:var(--danger);color:#fff;border-radius:999px;font-size:10px;padding:1px 5px}
+
+/* Login */
+.who{padding-top:8px}
+.who button.person{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:1px solid var(--line);
+  background:var(--card);border-radius:12px;padding:12px;margin-bottom:8px;min-height:52px;font-size:16px}
+.toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 12px);transform:translateX(-50%);z-index:50;
+  background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;max-width:90vw;
+  box-shadow:0 6px 20px rgba(0,0,0,.2);transition:opacity .2s}
+.empty{text-align:center;color:var(--muted);padding:24px 8px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Ferienplaner</h1>
+  <button class="me hidden" id="meBtn" data-action="switch"></button>
+</header>
+
+<main id="main"><p class="empty">Lade …</p></main>
+
+<div class="sheet" id="sheet"><div class="grab"></div><div class="sheet-inner" id="sheetBody"></div></div>
+
+<nav id="nav" class="hidden">
+  <button data-tab="cal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Kalender</button>
+  <button data-tab="mine"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>Meine</button>
+  <button data-tab="team"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.5"/><circle cx="17" cy="9" r="2.5"/><path d="M2.5 20c1-3.5 3.5-5.5 6.5-5.5s5.5 2 6.5 5.5M15 14.5c2.5 0 4.5 1.5 5.5 4.5"/></svg>Team</button>
+  <button data-tab="admin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>Admin<span class="badge hidden" id="adminBadge"></span></button>
+</nav>
+
+<script>
+const SUPABASE_URL = 'https://jrwwuequwhofjrhsxpxb.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_TL3V4k0W-FiZVg2gZK5qOA_P_q1_Shf';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const CATS = ['Clinic', 'Verkauf'];
+const S = {
+  employees: [], limits: {}, requests: [],
+  me: Number(localStorage.getItem('fp_me')) || null,
+  tab: 'cal', filter: 'Alle', teamFilter: 'Alle',
+  month: firstOfMonth(new Date()),
+  sel: null,                        // {start, end}
+  pin: sessionStorage.getItem('fp_pin') || null,
+  dayMap: new Map(), conflicts: new Map(),
+};
+
+/* ---------- Datum ---------- */
+function pad(n) { return String(n).padStart(2, '0'); }
+function iso(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+function parse(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
+function addDays(s, n) { const d = parse(s); d.setDate(d.getDate() + n); return iso(d); }
+function diff(a, b) { return Math.round((parse(b) - parse(a)) / 864e5); }
+function firstOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
+function today() { return iso(new Date()); }
+function isoWeek(d) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+  return Math.ceil(((t - Date.UTC(t.getUTCFullYear(), 0, 1)) / 864e5 + 1) / 7);
+}
+function fmt(s, opts = { weekday: 'short', day: 'numeric', month: 'numeric' }) {
+  return parse(s).toLocaleDateString('de-CH', opts);
+}
+function fmtRange(a, b) {
+  if (a === b) return fmt(a);
+  return `${fmt(a)} – ${fmt(b, { weekday: 'short', day: 'numeric', month: 'numeric', year: '2-digit' })}`;
+}
+function days(r) { return diff(r.start_date, r.end_date) + 1; }
+function overlaps(r, a, b) { return r.start_date <= b && r.end_date >= a; }
+
+/* ---------- Helpers ---------- */
+const $ = id => document.getElementById(id);
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function emp(id) { return S.employees.find(e => e.id === id); }
+function initials(n) { return n.split(/\s+/).map(p => p[0]).join('').slice(0, 2).toUpperCase(); }
+function avatar(e) { return `<span class="avatar c-${e.category}">${esc(initials(e.name))}</span>`; }
+function toast(msg) {
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => { t.style.opacity = 0; setTimeout(() => t.remove(), 250); }, 2600);
+}
+function statusTag(r) {
+  let h = r.is_prio ? '<span class="tag t-prio">Prio</span>' : '';
+  h += `<span class="tag t-${r.status}">${r.status}</span>`;
+  if (r.status !== 'abgelehnt' && S.conflicts.has(r.id)) h += '<span class="tag t-konflikt">Konflikt</span>';
+  return h;
+}
+
+/* ---------- Daten ---------- */
+async function load() {
+  const [e, l, r] = await Promise.all([
+    db.from('employees').select('*').order('name'),
+    db.from('category_limits').select('*'),
+    db.from('requests').select('*').order('start_date'),
+  ]);
+  if (e.error || l.error || r.error) { toast('Fehler beim Laden – Internet prüfen'); return; }
+  S.employees = e.data;
+  S.limits = Object.fromEntries(l.data.map(x => [x.category, x.max_parallel]));
+  S.requests = r.data;
+  if (S.me && !emp(S.me)) { S.me = null; localStorage.removeItem('fp_me'); }
+  computeConflicts();
+  render();
+}
+
+// Rangfolge pro Tag & Kategorie: Prio vor normal, dann genehmigt vor offen, dann wer zuerst eingetragen hat
+function rank(a, b) {
+  return (b.is_prio - a.is_prio)
+    || ((b.status === 'genehmigt') - (a.status === 'genehmigt'))
+    || a.created_at.localeCompare(b.created_at);
+}
+
+function computeConflicts() {
+  S.dayMap = new Map(); S.conflicts = new Map();
+  const perCat = new Map();
+  for (const r of S.requests) {
+    if (r.status === 'abgelehnt') continue;
+    const e = emp(r.employee_id); if (!e) continue;
+    for (let d = r.start_date; d <= r.end_date; d = addDays(d, 1)) {
+      if (!S.dayMap.has(d)) S.dayMap.set(d, []);
+      S.dayMap.get(d).push(r);
+      const k = d + '|' + e.category;
+      if (!perCat.has(k)) perCat.set(k, []);
+      perCat.get(k).push(r);
+    }
+  }
+  for (const [k, list] of perCat) {
+    const lim = S.limits[k.split('|')[1]] || 1;
+    if (list.length <= lim) continue;
+    list.sort(rank);
+    const ahead = list.slice(0, lim);
+    for (const r of list.slice(lim)) {
+      if (!S.conflicts.has(r.id)) S.conflicts.set(r.id, { days: 0, ahead: new Set() });
+      const c = S.conflicts.get(r.id); c.days++;
+      ahead.forEach(a => c.ahead.add(a.id));
+    }
+  }
+}
+
+function conflictText(r) {
+  const c = S.conflicts.get(r.id);
+  if (!c || r.status === 'abgelehnt') return '';
+  const names = [...c.ahead].map(id => S.requests.find(x => x.id === id))
+    .map(a => `${esc(emp(a.employee_id)?.name)}${a.is_prio ? ' (Prio)' : ''}`).join(', ');
+  return `<div class="warn">An ${c.days} Tag${c.days > 1 ? 'en' : ''} ist das Limit überschritten. Vorrang hat: ${names}</div>`;
+}
+
+/* ---------- Render ---------- */
+function render() {
+  const me = emp(S.me);
+  $('meBtn').classList.toggle('hidden', !me);
+  $('nav').classList.toggle('hidden', !me);
+  if (me) $('meBtn').innerHTML = `${avatar(me)}<span>${esc(me.name.split(' ')[0])}</span>`;
+  const open = S.requests.filter(r => r.status === 'offen').length;
+  $('adminBadge').textContent = open; $('adminBadge').classList.toggle('hidden', !open || !S.pin);
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === S.tab));
+  if (!me) { closeSheet(); $('main').innerHTML = renderWho(); return; }
+  $('main').innerHTML = { cal: renderCal, mine: renderMine, team: renderTeam, admin: renderAdmin }[S.tab]();
+  if (S.sel) renderSheet();
+}
+
+function renderWho() {
+  const act = S.employees.filter(e => e.active);
+  if (!act.length) return `<div class="who"><p class="empty">Noch keine Mitarbeiter erfasst.<br>Der Admin kann sie unten im Admin-Bereich anlegen.</p>
+    <button class="btn block" data-action="adminFromWho">Zum Admin-Bereich</button></div>`;
+  return `<div class="who"><h2>Wer bist du?</h2>` + CATS.map(c => {
+    const list = act.filter(e => e.category === c);
+    if (!list.length) return '';
+    return `<h2>${c}</h2>` + list.map(e => `<button class="person" data-action="pick" data-id="${e.id}">${avatar(e)}${esc(e.name)}</button>`).join('');
+  }).join('') + `<p class="hint"><button class="btn sm" data-action="adminFromWho">Admin</button></p></div>`;
+}
+
+function renderCal() {
+  const m = S.month, me = emp(S.me);
+  const start = new Date(m); start.setDate(1 - ((m.getDay() + 6) % 7));
+  const label = m.toLocaleDateString('de-CH', { month: 'long', year: 'numeric' });
+  const lim = S.limits[me.category] || 1;
+  let h = `<div class="cal-head"><button class="navbtn" data-action="prev" aria-label="Vorheriger Monat">‹</button>
+    <b>${label}</b><button class="navbtn" data-action="next" aria-label="Nächster Monat">›</button></div>
+    <div class="chips" style="margin-bottom:10px">${['Alle', ...CATS].map(f =>
+      `<button class="chip ${S.filter === f ? 'on' : ''}" data-action="filter" data-f="${f}">${f}</button>`).join('')}</div>
+    <div class="grid"><div class="dow">KW</div>${['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map(d => `<div class="dow">${d}</div>`).join('')}`;
+  const d = new Date(start);
+  for (let w = 0; w < 6; w++) {
+    if (w === 5 && d.getMonth() !== m.getMonth()) break;
+    h += `<button class="kw" data-action="week" data-d="${iso(d)}" aria-label="Ganze Woche wählen">${isoWeek(d)}</button>`;
+    for (let i = 0; i < 7; i++, d.setDate(d.getDate() + 1)) {
+      const ds = iso(d);
+      const list = (S.dayMap.get(ds) || []).filter(r => S.filter === 'Alle' || emp(r.employee_id).category === S.filter);
+      const sameCatOthers = (S.dayMap.get(ds) || []).filter(r => r.employee_id !== S.me && emp(r.employee_id).category === me.category).length;
+      const cls = ['day',
+        d.getMonth() !== m.getMonth() && 'out', i > 4 && 'we', ds === today() && 'today',
+        sameCatOthers >= lim && 'full',
+        (S.dayMap.get(ds) || []).some(r => r.employee_id === S.me) && 'mine',
+        S.sel && ds >= S.sel.start && ds <= S.sel.end && 'sel'].filter(Boolean).join(' ');
+      const dots = list.slice(0, 6).map(r => `<span class="dot ${emp(r.employee_id).category} ${r.status}"></span>`).join('');
+      h += `<button class="${cls}" data-action="day" data-d="${ds}"><span class="n">${d.getDate()}</span>
+        <span class="dots">${dots}</span>${list.length > 6 ? `<span class="more">+${list.length - 6}</span>` : ''}</button>`;
+    }
+  }
+  h += `</div><div class="legend">
+    <span><i class="dot Clinic"></i>Clinic</span><span><i class="dot Verkauf"></i>Verkauf</span>
+    <span><i class="dot offen Clinic"></i>offen</span>
+    <span><i style="width:14px;height:10px;border-radius:3px;background:var(--full);display:inline-block"></i>${me.category} voll</span>
+  </div><p class="hint">Tippe auf einen Tag, dann auf den letzten Ferientag.<br>Tippe auf die KW-Nummer für eine ganze Woche.</p>`;
+  return h;
+}
+
+function renderMine() {
+  const mine = S.requests.filter(r => r.employee_id === S.me);
+  const y = new Date().getFullYear();
+  const prios = mine.filter(r => r.is_prio && r.status !== 'abgelehnt');
+  const appr = mine.filter(r => r.status === 'genehmigt' && r.start_date.startsWith(y)).reduce((s, r) => s + days(r), 0);
+  let h = `<h2>Übersicht</h2><div class="card small">
+    <div>Genehmigte Ferientage ${y}: <b>${appr}</b></div>
+    <div>Prio-Woche: ${prios.length ? prios.map(p => `<b>KW ${isoWeek(parse(p.start_date))}/${p.start_date.slice(0, 4)}</b>`).join(', ') : '<span class="muted">noch keine gewählt</span>'}</div>
+  </div><h2>Meine Wünsche</h2>`;
+  if (!mine.length) return h + `<div class="card empty">Noch nichts eingetragen.<br><br><button class="btn primary" data-tab="cal">Im Kalender eintragen</button></div>`;
+  return h + mine.map(r => `<div class="card"><div class="title">${fmtRange(r.start_date, r.end_date)}</div>
+    <div class="small muted">${days(r)} Tage · KW ${isoWeek(parse(r.start_date))} ${statusTag(r)}</div>
+    ${r.note ? `<div class="small" style="margin-top:6px">${esc(r.note)}</div>` : ''}
+    ${conflictText(r)}
+    ${r.status === 'offen' ? `<div class="actions"><button class="btn sm danger" data-action="delMine" data-id="${r.id}">Zurückziehen</button></div>` : ''}
+  </div>`).join('');
+}
+
+function renderTeam() {
+  const t = today();
+  const list = S.requests.filter(r => r.end_date >= t && r.status !== 'abgelehnt' && emp(r.employee_id)
+    && (S.teamFilter === 'Alle' || emp(r.employee_id).category === S.teamFilter));
+  let h = `<div class="chips" style="margin-top:4px">${['Alle', ...CATS].map(f =>
+    `<button class="chip ${S.teamFilter === f ? 'on' : ''}" data-action="teamFilter" data-f="${f}">${f}</button>`).join('')}</div>`;
+  if (!list.length) return h + '<p class="empty">Keine geplanten Ferien.</p>';
+  let cur = '';
+  for (const r of list) {
+    const mo = fmt(r.start_date, { month: 'long', year: 'numeric' });
+    if (mo !== cur) { if (cur) h += '</div>'; h += `<h2>${mo}</h2><div class="card">`; cur = mo; }
+    const e = emp(r.employee_id);
+    h += `<div class="item" style="padding:6px 0">${avatar(e)}<div class="body"><div class="title">${esc(e.name)}</div>
+      <div class="small muted">${fmtRange(r.start_date, r.end_date)} · ${days(r)} T. ${statusTag(r)}</div></div></div>`;
+  }
+  return h + '</div>';
+}
+
+function renderAdmin() {
+  if (!S.pin) return `<h2>Admin</h2><div class="card"><label class="f">Admin-PIN</label>
+    <input type="password" inputmode="numeric" id="pinIn" autocomplete="off">
+    <div class="actions"><button class="btn primary block" data-action="login">Anmelden</button></div></div>`;
+  const open = S.requests.filter(r => r.status === 'offen').sort(rank);
+  const done = S.requests.filter(r => r.status !== 'offen' && r.end_date >= today());
+  const card = r => {
+    const e = emp(r.employee_id);
+    return `<div class="card"><div class="item">${avatar(e)}<div class="body">
+      <div class="title">${esc(e.name)} <span class="small muted">${e.category}</span></div>
+      <div class="small muted">${fmtRange(r.start_date, r.end_date)} · ${days(r)} T. ${statusTag(r)}</div>
+      ${r.note ? `<div class="small" style="margin-top:4px">${esc(r.note)}</div>` : ''}</div></div>
+      ${conflictText(r)}
+      <div class="actions">
+        ${r.status !== 'genehmigt' ? `<button class="btn sm ok" data-action="status" data-s="genehmigt" data-id="${r.id}">Genehmigen</button>` : ''}
+        ${r.status !== 'abgelehnt' ? `<button class="btn sm danger" data-action="status" data-s="abgelehnt" data-id="${r.id}">Ablehnen</button>` : ''}
+        ${r.status !== 'offen' ? `<button class="btn sm" data-action="status" data-s="offen" data-id="${r.id}">Auf offen</button>` : ''}
+        <button class="btn sm" data-action="adminDel" data-id="${r.id}">Löschen</button>
+      </div></div>`;
+  };
+  let h = `<h2>Offene Wünsche (${open.length})</h2>` + (open.length ? open.map(card).join('') : '<div class="card empty">Alles erledigt 👍</div>');
+  h += `<h2>Limit gleichzeitig abwesend</h2><div class="card"><div class="row">` + CATS.map(c =>
+    `<div><label class="f">${c}</label><input type="number" min="1" max="20" id="lim-${c}" value="${S.limits[c] || 1}"></div>`).join('') +
+    `</div><div class="actions"><button class="btn sm primary" data-action="saveLimits">Speichern</button></div></div>`;
+  h += `<h2>Mitarbeiter</h2><div class="card">` + S.employees.map(e => `<div class="row" style="margin-bottom:8px">
+      <input type="text" id="en-${e.id}" value="${esc(e.name)}" style="flex:2">
+      <select id="ec-${e.id}">${CATS.map(c => `<option ${c === e.category ? 'selected' : ''}>${c}</option>`).join('')}</select>
+      <select id="ea-${e.id}" style="flex:.9"><option value="1" ${e.active ? 'selected' : ''}>aktiv</option><option value="0" ${e.active ? '' : 'selected'}>inaktiv</option></select>
+      <button class="btn sm" style="flex:none" data-action="saveEmp" data-id="${e.id}">✓</button></div>`).join('') +
+    `<div class="row" style="margin-top:12px"><input type="text" id="newName" placeholder="Neuer Name" style="flex:2">
+      <select id="newCat">${CATS.map(c => `<option>${c}</option>`).join('')}</select>
+      <button class="btn sm primary" style="flex:none" data-action="addEmp">+</button></div></div>`;
+  h += `<h2>Bearbeitet (zukünftig)</h2>` + (done.length ? done.map(card).join('') : '<div class="card empty">–</div>');
+  h += `<h2>Einstellungen</h2><div class="card"><label class="f">Neue Admin-PIN</label>
+    <div class="row"><input type="password" inputmode="numeric" id="newPin" autocomplete="new-password"><button class="btn sm" style="flex:none" data-action="changePin">Ändern</button></div>
+    <div class="actions"><button class="btn sm danger" data-action="logout">Admin abmelden</button></div></div>`;
+  return h;
+}
+
+/* ---------- Sheet (Ferienwunsch) ---------- */
+function openSel(start, end) { S.sel = { start, end: end || start }; render(); $('sheet').classList.add('open'); document.body.classList.add('sheet-open'); }
+function closeSheet() { S.sel = null; $('sheet').classList.remove('open'); document.body.classList.remove('sheet-open'); }
+
+function renderSheet() {
+  const { start, end } = S.sel, me = emp(S.me), n = diff(start, end) + 1;
+  const year = start.slice(0, 4);
+  const lim = S.limits[me.category] || 1;
+  const away = S.requests.filter(r => r.status !== 'abgelehnt' && r.employee_id !== S.me && overlaps(r, start, end));
+  let fullDays = 0;
+  for (let d = start; d <= end; d = addDays(d, 1))
+    if ((S.dayMap.get(d) || []).filter(r => r.employee_id !== S.me && emp(r.employee_id).category === me.category).length >= lim) fullDays++;
+  const prioUsed = S.requests.find(r => r.employee_id === S.me && r.is_prio && r.status !== 'abgelehnt' && r.start_date.startsWith(year));
+  const prioOk = !prioUsed && n <= 7;
+  const prioHint = prioUsed ? `Deine Prio-Woche ${year} ist schon vergeben (KW ${isoWeek(parse(prioUsed.start_date))}).`
+    : n > 7 ? 'Prio gilt nur für eine Woche (max. 7 Tage).'
+    : 'Einmal pro Jahr. Hat Vorrang vor normalen Wünschen, wenn zu viele gleichzeitig weg wollen.';
+  const prev = $('prio')?.checked, prevNote = $('fNote')?.value || '';
+  $('sheetBody').innerHTML = `
+    <div class="row" style="justify-content:space-between"><b style="flex:none">${start === end ? 'Ferientag' : 'Ferien'} · ${n} Tag${n > 1 ? 'e' : ''}</b>
+      <button class="btn sm" style="flex:none" data-action="close">Schliessen</button></div>
+    <div class="row" style="margin-top:10px">
+      <div><label class="f">Von</label><input type="date" id="fFrom" value="${start}"></div>
+      <div><label class="f">Bis</label><input type="date" id="fTo" value="${end}"></div>
+    </div>
+    ${start === end ? '<p class="small muted" style="margin:8px 0 0">Tippe im Kalender auf den letzten Ferientag.</p>' : ''}
+    ${fullDays ? `<div class="warn">⚠️ An ${fullDays} Tag${fullDays > 1 ? 'en' : ''} sind schon ${lim} von ${me.category} weg (Limit ${lim}). ${prioOk ? 'Mit der Prio-Woche hast du Vorrang vor normalen Wünschen.' : 'Dein Wunsch kommt auf die Warteliste.'}</div>` : ''}
+    <label class="prio-box"><input type="checkbox" id="prio" ${prioOk ? '' : 'disabled'} ${prioOk && prev ? 'checked' : ''}>
+      <span><b>Als Prio-Woche markieren</b><br><span class="small muted">${prioHint}</span></span></label>
+    <input type="text" id="fNote" placeholder="Bemerkung (optional)" maxlength="200" value="${esc(prevNote)}">
+    <div class="actions"><button class="btn primary block" data-action="submit">Ferienwunsch senden</button></div>
+    <h2 style="margin-top:16px">In diesem Zeitraum weg (${away.length})</h2>
+    ${away.length ? `<ul class="away">${away.map(r => { const e = emp(r.employee_id);
+      return `<li>${avatar(e)}<span style="flex:1">${esc(e.name)}<br><span class="small muted">${fmtRange(r.start_date, r.end_date)}</span></span>${statusTag(r)}</li>`; }).join('')}</ul>`
+      : '<p class="small muted">Niemand – freie Bahn.</p>'}`;
+}
+
+async function submit() {
+  const start = $('fFrom').value, end = $('fTo').value, is_prio = $('prio').checked, note = $('fNote').value.trim() || null;
+  if (!start || !end || end < start) return toast('Bitte gültige Daten wählen');
+  if (start < today()) return toast('Ferien in der Vergangenheit geht nicht');
+  if (S.requests.some(r => r.employee_id === S.me && r.status !== 'abgelehnt' && overlaps(r, start, end)))
+    return toast('Du hast in diesem Zeitraum schon einen Wunsch');
+  const { error } = await db.from('requests').insert({ employee_id: S.me, start_date: start, end_date: end, is_prio, note });
+  if (error) return toast(error.code === '23505' ? 'Du hast für dieses Jahr schon eine Prio-Woche' : 'Fehler: ' + error.message);
+  closeSheet(); toast('Ferienwunsch gesendet ✓'); await load();
+}
+
+/* ---------- Admin ---------- */
+async function rpc(fn, args) {
+  const { error } = await db.rpc(fn, { p_pin: S.pin, ...args });
+  if (error) { toast(error.message.includes('PIN') ? 'PIN ungültig – bitte neu anmelden' : 'Fehler: ' + error.message);
+    if (error.message.includes('PIN')) { S.pin = null; sessionStorage.removeItem('fp_pin'); render(); } return false; }
+  await load(); return true;
+}
+
+/* ---------- Events ---------- */
+document.addEventListener('click', async ev => {
+  const t = ev.target.closest('[data-action],[data-tab]'); if (!t) return;
+  if (t.dataset.tab) { S.tab = t.dataset.tab; closeSheet(); render(); window.scrollTo(0, 0); return; }
+  const a = t.dataset.action, id = Number(t.dataset.id);
+  switch (a) {
+    case 'pick': S.me = id; localStorage.setItem('fp_me', id); S.tab = 'cal'; render(); break;
+    case 'switch': if (confirm('Person wechseln?')) { S.me = null; localStorage.removeItem('fp_me'); render(); } break;
+    case 'adminFromWho': {
+      const pin = prompt('Admin-PIN'); if (!pin) break;
+      const { data } = await db.rpc('admin_login', { p_pin: pin });
+      if (!data) { toast('Falsche PIN'); break; }
+      S.pin = pin; sessionStorage.setItem('fp_pin', pin);
+      const name = prompt('Ersten Mitarbeiter anlegen – Name:'); if (!name) break;
+      const cat = confirm(`Ist ${name} in der Clinic?\nOK = Clinic, Abbrechen = Verkauf`) ? 'Clinic' : 'Verkauf';
+      if (await rpc('admin_save_employee', { p_id: null, p_name: name, p_category: cat, p_active: true })) toast('Angelegt – jetzt Namen wählen');
+      break; }
+    case 'prev': S.month = new Date(S.month.getFullYear(), S.month.getMonth() - 1, 1); render(); break;
+    case 'next': S.month = new Date(S.month.getFullYear(), S.month.getMonth() + 1, 1); render(); break;
+    case 'filter': S.filter = t.dataset.f; render(); break;
+    case 'teamFilter': S.teamFilter = t.dataset.f; render(); break;
+    case 'day': {
+      const d = t.dataset.d;
+      if (S.sel && S.sel.start === S.sel.end && d !== S.sel.start)
+        openSel(d < S.sel.start ? d : S.sel.start, d < S.sel.start ? S.sel.start : d);
+      else openSel(d);
+      break; }
+    case 'week': { const mon = t.dataset.d; openSel(mon, addDays(mon, 6)); break; }
+    case 'close': closeSheet(); render(); break;
+    case 'submit': t.disabled = true; await submit(); t.disabled = false; break;
+    case 'delMine': {
+      if (!confirm('Diesen Ferienwunsch zurückziehen?')) break;
+      const { error } = await db.from('requests').delete().eq('id', id);
+      if (error) toast('Fehler: ' + error.message); else { toast('Zurückgezogen'); await load(); }
+      break; }
+    case 'login': {
+      const pin = $('pinIn').value; const { data } = await db.rpc('admin_login', { p_pin: pin });
+      if (!data) { toast('Falsche PIN'); break; }
+      S.pin = pin; sessionStorage.setItem('fp_pin', pin); render(); break; }
+    case 'logout': S.pin = null; sessionStorage.removeItem('fp_pin'); render(); break;
+    case 'status': await rpc('admin_set_status', { p_id: id, p_status: t.dataset.s }); break;
+    case 'adminDel': if (confirm('Endgültig löschen?')) await rpc('admin_delete_request', { p_id: id }); break;
+    case 'saveLimits':
+      for (const c of CATS) await rpc('admin_set_limit', { p_category: c, p_max: Math.max(1, Number($('lim-' + c).value) || 1) });
+      toast('Limits gespeichert'); break;
+    case 'saveEmp':
+      if (await rpc('admin_save_employee', { p_id: id, p_name: $('en-' + id).value, p_category: $('ec-' + id).value, p_active: $('ea-' + id).value === '1' })) toast('Gespeichert');
+      break;
+    case 'addEmp': {
+      const name = $('newName').value.trim(); if (!name) return toast('Name fehlt');
+      if (await rpc('admin_save_employee', { p_id: null, p_name: name, p_category: $('newCat').value, p_active: true })) toast(name + ' angelegt');
+      break; }
+    case 'changePin': {
+      const np = $('newPin').value; if (np.length < 4) return toast('Mind. 4 Zeichen');
+      const { error } = await db.rpc('admin_change_pin', { p_pin: S.pin, p_new: np });
+      if (error) toast('Fehler: ' + error.message); else { S.pin = np; sessionStorage.setItem('fp_pin', np); toast('PIN geändert'); }
+      break; }
+  }
+});
+
+document.addEventListener('change', ev => {
+  if (!S.sel || !['fFrom', 'fTo'].includes(ev.target.id)) return;
+  let a = $('fFrom').value, b = $('fTo').value;
+  if (!a) return; if (!b || b < a) b = a;
+  S.sel = { start: a, end: b }; S.month = firstOfMonth(parse(a)); render();
+});
+
+/* ---------- Live-Updates ---------- */
+let reloadTimer;
+db.channel('live').on('postgres_changes', { event: '*', schema: 'public' }, () => {
+  clearTimeout(reloadTimer); reloadTimer = setTimeout(load, 300);
+}).subscribe();
+document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+
+load();
+</script>
+</body>
+</html>
