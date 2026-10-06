@@ -380,7 +380,7 @@ function render(quiet) {
   $('main').innerHTML = (me || S.blockMode ? '' : '<button class="btn sm" style="margin-top:4px" data-action="backToWho">‹ Zur Namensauswahl</button>')
     + { cal: renderCal, mine: renderMine, team: renderTeam, admin: renderAdmin }[S.tab]();
   if (draft && $('newNames')) $('newNames').value = draft;
-  document.body.classList.toggle('wide', S.tab === 'admin' && S.adminView === 'planner' && !!S.pin);
+  document.body.classList.toggle('wide', (S.tab === 'admin' && S.adminView === 'planner' && !!S.pin) || (S.tab === 'team' && S.teamView === 'Planer'));
   if (S.sel) renderSheet(); else if (S.plReq) renderPlReqSheet();
 }
 
@@ -464,7 +464,10 @@ function renderTeam() {
   const t = today();
   const list = S.requests.filter(r => r.end_date >= t && r.status !== 'abgelehnt' && emp(r.employee_id)
     && (S.teamFilter === 'Alle' || emp(r.employee_id).category === S.teamFilter));
-  let h = `<div class="chips" style="margin-top:4px">${['Alle', ...CATS].map(f =>
+  const viewChips = `<div class="chips" style="margin:4px 0 10px">${['Liste', 'Planer'].map(v =>
+    `<button class="chip ${(S.teamView || 'Liste') === v ? 'on' : ''}" data-action="teamView" data-v="${v}">${v}</button>`).join('')}</div>`;
+  if (S.teamView === 'Planer') return viewChips + renderPlanner(false);
+  let h = viewChips + `<div class="chips">${['Alle', ...CATS].map(f =>
     `<button class="chip ${S.teamFilter === f ? 'on' : ''}" data-action="teamFilter" data-f="${f}">${f}</button>`).join('')}</div>`;
   if (!list.length) return h + '<p class="empty">Keine geplanten Ferien.</p>';
   let cur = '';
@@ -556,29 +559,30 @@ function dayCls(ds, cat) {
   return [(w === 0 || w === 6) && 'we', h && 'hol-' + h.type, blockedFor(ds, cat) && 'blk', ds === today() && 'tod'].filter(Boolean).join(' ');
 }
 function plEmployees(cat) { return S.employees.filter(e => e.category === cat && (e.active || S.requests.some(r => r.employee_id === e.id && r.status !== 'abgelehnt'))); }
-function plName(e) { return `<th class="nm" title="${esc(e.name)}">${esc(e.name)}${e.pensum < 100 ? ` <small>${e.pensum}%</small>` : ''}</th>`; }
+// admin = false: Team-Ansicht ohne Pensum, Guthaben und Freigabe
+function plName(e, admin) { return `<th class="nm" title="${esc(e.name)}">${esc(e.name)}${admin && e.pensum < 100 ? ` <small>${e.pensum}%</small>` : ''}</th>`; }
 
-function renderPlanner() {
+function renderPlanner(admin = true) {
   const yearMode = S.plView === 'Jahr';
   const y = S.plYear || new Date().getFullYear();
   const label = yearMode ? y : S.month.toLocaleDateString('de-CH', { month: 'long', year: 'numeric' });
   let h = `<div class="row" style="margin:12px 0 10px;justify-content:space-between">
-      <button class="btn sm" style="flex:none" data-action="plBack">‹ Admin</button>
+      ${admin ? '<button class="btn sm" style="flex:none" data-action="plBack">‹ Admin</button>' : '<span></span>'}
       <div class="chips" style="flex:none">${['Monat', 'Jahr'].map(v => `<button class="chip ${(S.plView || 'Monat') === v ? 'on' : ''}" data-action="plView" data-v="${v}">${v}</button>`).join('')}</div></div>
     <div class="cal-head"><button class="navbtn" data-action="plPrev" aria-label="Zurück">‹</button><b>${label}</b>
       <button class="navbtn" data-action="plNext" aria-label="Weiter">›</button></div>`;
-  h += `<div class="pl-wrap">${yearMode ? plYear(y) : plMonth()}</div>`;
+  h += `<div class="pl-wrap">${yearMode ? plYear(y, admin) : plMonth(admin)}</div>`;
   h += `<div class="pl-legend">
     <span><i style="background:var(--clinic)"></i>Clinic</span><span><i style="background:var(--verkauf)"></i>Verkauf</span>
     <span><i style="background:var(--verkauf);opacity:.4"></i>offen</span><span><i style="background:var(--verkauf);box-shadow:inset 0 -3px 0 #5b3cc4"></i>Prio</span>
     <span><i style="background:var(--holCHbg);border:1px solid var(--holCH)"></i>Feiertag CH</span><span><i style="background:var(--holZHbg);border:1px solid var(--holZH)"></i>Feiertag ZH</span>
     <span><i style="background:repeating-linear-gradient(135deg,var(--card) 0 3px,var(--blk) 3px 6px);border:1px solid var(--line)"></i>Sperrtag</span>
     <span><b style="color:var(--danger)">2</b>&nbsp;= mehr weg als erlaubt</span>
-  </div><p class="hint">${yearMode ? 'Zahl = Ferientage in dieser Woche. Tippe auf eine Woche, um den Monat zu öffnen.' : 'Tippe auf einen Balken, um den Wunsch zu sehen, zu genehmigen oder abzulehnen.'}</p>`;
+  </div><p class="hint">${yearMode ? `Zahl = ${admin ? 'Ferientage' : 'freie Arbeitstage'} in dieser Woche. Tippe auf eine Woche, um den Monat zu öffnen.` : admin ? 'Tippe auf einen Balken, um den Wunsch zu sehen, zu genehmigen oder abzulehnen.' : 'Tippe auf einen Balken für Details.'}</p>`;
   return h;
 }
 
-function plMonth() {
+function plMonth(admin) {
   const y = S.month.getFullYear(), mo = S.month.getMonth(), nd = new Date(y, mo + 1, 0).getDate();
   const dates = Array.from({ length: nd }, (_, i) => iso(new Date(y, mo, i + 1)));
   let h = `<table class="pl"><thead><tr><th class="nm"></th>${dates.map(ds => { const hol = holiday(ds);
@@ -588,7 +592,7 @@ function plMonth() {
     h += `<tr class="grp"><th class="nm">${cat} <small>max ${lim}</small></th>${dates.map(ds => { const n = countOn(ds, cat);
       return `<td class="${n > lim ? 'over' : n && n === lim ? 'at' : ''}">${n || ''}</td>`; }).join('')}</tr>`;
     for (const e of plEmployees(cat)) {
-      h += `<tr>${plName(e)}${dates.map(ds => { const r = reqOn(e.id, ds);
+      h += `<tr>${plName(e, admin)}${dates.map(ds => { const r = reqOn(e.id, ds);
         const bar = r ? `<button class="bar ${cat} ${r.status}${r.is_prio ? ' prio' : ''}${ds === r.start_date || ds.endsWith('-01') ? ' start' : ''}${ds === r.end_date || ds === dates[nd - 1] ? ' end' : ''}"
           data-action="plReq" data-id="${r.id}" aria-label="${esc(e.name)} ${fmtRange(r.start_date, r.end_date)}"></button>` : '';
         return `<td class="${dayCls(ds, cat)}">${bar}</td>`; }).join('')}</tr>`;
@@ -597,7 +601,7 @@ function plMonth() {
   return h + '</tbody></table>';
 }
 
-function plYear(y) {
+function plYear(y, admin) {
   // ISO-Kalenderwochen des Jahres (Montag der Woche mit dem 4. Januar = KW 1)
   const d4 = new Date(y, 0, 4); d4.setDate(4 - ((d4.getDay() + 6) % 7));
   const weeks = [];
@@ -605,22 +609,23 @@ function plYear(y) {
   const months = [];
   for (const mon of weeks) { const m = addDays(mon, 3).slice(0, 7); if (months.at(-1)?.m === m) months.at(-1).n++; else months.push({ m, n: 1 }); }
   let h = `<table class="pl"><thead><tr class="mo"><th class="nm"></th>${months.map(x =>
-    `<th colspan="${x.n}">${parse(x.m + '-01').toLocaleDateString('de-CH', { month: 'short' })}</th>`).join('')}<th></th></tr>
-    <tr><th class="nm"></th>${weeks.map(mon => `<th class="${today() >= mon && today() <= addDays(mon, 6) ? 'tod' : ''}" title="${fmtRange(mon, addDays(mon, 6))}">${isoWeek(parse(mon))}</th>`).join('')}<th>Total</th></tr></thead><tbody>`;
+    `<th colspan="${x.n}">${parse(x.m + '-01').toLocaleDateString('de-CH', { month: 'short' })}</th>`).join('')}${admin ? '<th></th>' : ''}</tr>
+    <tr><th class="nm"></th>${weeks.map(mon => `<th class="${today() >= mon && today() <= addDays(mon, 6) ? 'tod' : ''}" title="${fmtRange(mon, addDays(mon, 6))}">${isoWeek(parse(mon))}</th>`).join('')}${admin ? '<th>Total</th>' : ''}</tr></thead><tbody>`;
   for (const cat of CATS) {
     const lim = S.limits[cat] || 1;
     h += `<tr class="grp"><th class="nm">${cat} <small>max ${lim}</small></th>${weeks.map(mon => {
       let n = 0; for (let i = 0; i < 7; i++) n = Math.max(n, countOn(addDays(mon, i), cat));
-      return `<td class="${n > lim ? 'over' : n && n === lim ? 'at' : ''}">${n || ''}</td>`; }).join('')}<td></td></tr>`;
+      return `<td class="${n > lim ? 'over' : n && n === lim ? 'at' : ''}">${n || ''}</td>`; }).join('')}${admin ? '<td></td>' : ''}</tr>`;
     for (const e of plEmployees(cat)) {
       const b = balance(e.id, y);
-      h += `<tr>${plName(e)}${weeks.map(mon => {
+      h += `<tr>${plName(e, admin)}${weeks.map(mon => {
         const rs = S.requests.filter(r => r.employee_id === e.id && r.status !== 'abgelehnt' && overlaps(r, mon, addDays(mon, 6)));
         if (!rs.length) return '<td></td>';
-        const n = rs.reduce((sum, r) => sum + ft(workDays(r.start_date > mon ? r.start_date : mon, r.end_date < addDays(mon, 6) ? r.end_date : addDays(mon, 6)), e.id), 0);
+        const n = rs.reduce((sum, r) => { const k = workDays(r.start_date > mon ? r.start_date : mon, r.end_date < addDays(mon, 6) ? r.end_date : addDays(mon, 6));
+          return sum + (admin ? ft(k, e.id) : k); }, 0);
         const open = rs.some(r => r.status === 'offen');
         return `<td><button class="wk ${cat}${open ? ' offen' : ''}" data-action="plWeek" data-d="${addDays(mon, 3)}" title="${fmtRange(mon, addDays(mon, 6))}">${fmtD(n)}</button></td>`;
-      }).join('')}<td class="tot">${fmtD(b.appr + b.open)}${b.total != null ? ` / ${fmtD(b.total)}` : ''}</td></tr>`;
+      }).join('')}${admin ? `<td class="tot">${fmtD(b.appr + b.open)}${b.total != null ? ` / ${fmtD(b.total)}` : ''}</td>` : ''}</tr>`;
     }
   }
   return h + '</tbody></table>';
@@ -630,7 +635,14 @@ function renderPlReqSheet() {
   const r = S.requests.find(x => x.id === S.plReq);
   if (!r) return closeSheet();
   $('sheetBody').innerHTML = `<div class="row" style="justify-content:space-between;margin-bottom:8px"><b style="flex:none">Ferienwunsch</b>
-    <button class="btn sm" style="flex:none" data-action="close">Schliessen</button></div>${adminCard(r)}`;
+    <button class="btn sm" style="flex:none" data-action="close">Schliessen</button></div>${S.tab === 'admin' ? adminCard(r) : teamCard(r)}`;
+}
+
+function teamCard(r) {
+  const e = emp(r.employee_id);
+  return `<div class="card"><div class="item">${avatar(e)}<div class="body">
+    <div class="title">${esc(e.name)} <span class="small muted">${e.category}</span></div>
+    <div class="small muted">${fmtRange(r.start_date, r.end_date)} · ${workDays(r.start_date, r.end_date)} Arbeitstage ${statusTag(r)}</div></div></div></div>`;
 }
 
 /* ---------- Sheet (Ferienwunsch) ---------- */
@@ -769,6 +781,7 @@ document.addEventListener('click', async ev => {
       if (!data) { toast('Falsche PIN'); break; }
       S.pin = pin; localStorage.setItem('fp_pin', pin); render(); break; }
     case 'logout': S.pin = null; localStorage.removeItem('fp_pin'); render(); break;
+    case 'teamView': S.teamView = t.dataset.v; closeSheet(); render(); break;
     case 'planner': S.adminView = 'planner'; render(); window.scrollTo(0, 0); break;
     case 'plBack': S.adminView = null; closeSheet(); render(); window.scrollTo(0, 0); break;
     case 'plView': S.plView = t.dataset.v; if (S.plView === 'Jahr') S.plYear = S.month.getFullYear(); else if (S.plYear) S.month = new Date(S.plYear, S.plYear === new Date().getFullYear() ? new Date().getMonth() : 0, 1); render(); break;
