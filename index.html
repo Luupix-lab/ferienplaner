@@ -53,10 +53,10 @@ h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted
 .chip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 12px;font-size:13px}
 .chip.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
 .tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;margin-left:4px;vertical-align:1px}
-.t-offen{background:#fff2d6;color:#8a5a00} .t-genehmigt{background:#dcf3e5;color:#1d6b3e} .t-abgelehnt{background:#fbe0e0;color:#9b2c2c}
+.t-offen{background:#fff2d6;color:#8a5a00} .t-bestaetigt{background:#e3eefa;color:#1f4f8a} .t-genehmigt{background:#dcf3e5;color:#1d6b3e} .t-abgelehnt{background:#fbe0e0;color:#9b2c2c}
 .t-prio{background:#ece4ff;color:#5b3cc4} .t-konflikt{background:#fbe0e0;color:#9b2c2c} .t-pruef{background:#fbe3ef;color:#a3245e} .t-mil{background:#e8eddc;color:#4b5d23}
 @media (prefers-color-scheme:dark){
-  .t-offen{background:#3d3218;color:#f3cf7a} .t-genehmigt{background:#183526;color:#7fdca3}
+  .t-offen{background:#3d3218;color:#f3cf7a} .t-bestaetigt{background:#1d2c3d;color:#8fb8ec} .t-genehmigt{background:#183526;color:#7fdca3}
   .t-abgelehnt,.t-konflikt{background:#3d1d1d;color:#f19a9a} .t-prio{background:#2b2350;color:#b9a6ff} .t-pruef{background:#3d1a2b;color:#f29cc4} .t-mil{background:#262d18;color:#b7c98a}
 }
 
@@ -92,6 +92,7 @@ h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted
 .dot{width:7px;height:7px;border-radius:50%}
 .dot.Clinic{background:var(--clinic)} .dot.Verkauf{background:var(--verkauf)}
 .dot.offen{background:transparent!important;border:1.5px solid}
+.dot.bestaetigt{opacity:.55}
 .dot.pruef{background:var(--pruef)} .dot.mil{background:var(--mil)}
 .dot.offen.Clinic{border-color:var(--clinic)} .dot.offen.Verkauf{border-color:var(--verkauf)} .dot.offen.pruef{border-color:var(--pruef)} .dot.offen.mil{border-color:var(--mil)}
 .more{font-size:9px;color:var(--muted);line-height:7px}
@@ -189,7 +190,7 @@ table.pl{border-collapse:separate;border-spacing:0;font-size:11px;min-width:100%
 .pl td.tot{padding:0 8px;white-space:nowrap;font-weight:600}
 .bar{display:block;width:100%;height:18px;border:none;padding:0;margin:0}
 .bar.Clinic{background:var(--clinic)} .bar.Verkauf{background:var(--verkauf)}
-.bar.offen{opacity:.4}
+.bar.offen{opacity:.4} .bar.bestaetigt{opacity:.7}
 .bar.prio{box-shadow:inset 0 -4px 0 #5b3cc4}
 .bar.pruef,.wk.pruef{background:var(--pruef)} .bar.mil,.wk.mil{background:var(--mil)}
 .bar.start{border-radius:5px 0 0 5px} .bar.end{border-radius:0 5px 5px 0} .bar.start.end{border-radius:5px}
@@ -343,10 +344,25 @@ function limitFor(cat, ds) { return S.monthLimits?.[cat]?.[+ds.slice(5, 7)] ?? (
 // Zum Limit zählen nur Ferien von Festangestellten
 function limited(r) { return r.kind === 'ferien' && !emp(r.employee_id)?.hourly; }
 function dayLabel(r) { return emp(r.employee_id)?.hourly || r.kind !== 'ferien' ? `${workDays(r.start_date, r.end_date)} Arbeitstage` : fmtD(wd(r)) + ' Ferientage'; }
+// Freigabe: Ferien offen → bestätigt (Teamleitung) → genehmigt (Verkaufsleitung); WK/Prüfung offen → genehmigt
+const STATUS = { offen: 'offen', bestaetigt: 'bestätigt', genehmigt: 'genehmigt', abgelehnt: 'abgelehnt' };
+function pending(r) { return r.status === 'offen' || r.status === 'bestaetigt'; }
+function nextStep(r) {
+  if (r.status === 'offen') return r.kind === 'ferien' ? ['bestaetigt', 'Bestätigen (TL)'] : ['genehmigt', 'Bestätigen'];
+  if (r.status === 'bestaetigt') return ['genehmigt', 'Final genehmigen (VL)'];
+  return null;
+}
+function statusButtons(r, withDelete) {
+  const ns = nextStep(r);
+  return `${ns ? `<button class="btn sm ok" data-action="status" data-s="${ns[0]}" data-id="${r.id}">${ns[1]}</button>` : ''}
+    ${r.status !== 'abgelehnt' ? `<button class="btn sm danger" data-action="status" data-s="abgelehnt" data-id="${r.id}">Ablehnen</button>` : ''}
+    ${r.status !== 'offen' ? `<button class="btn sm" data-action="status" data-s="offen" data-id="${r.id}">Auf offen</button>` : ''}
+    ${withDelete ? `<button class="btn sm" data-action="adminDel" data-id="${r.id}">Löschen</button>` : ''}`;
+}
 function statusTag(r) {
   let h = r.kind === 'pruefung' ? '<span class="tag t-pruef">Prüfung</span>' : r.kind === 'wk' ? '<span class="tag t-mil">WK</span>' : '';
   h += r.is_prio ? '<span class="tag t-prio">Prio</span>' : '';
-  h += `<span class="tag t-${r.status}">${r.status}</span>`;
+  h += `<span class="tag t-${r.status}">${STATUS[r.status] || r.status}</span>`;
   if (r.status !== 'abgelehnt' && S.conflicts.has(r.id)) h += '<span class="tag t-konflikt">Konflikt</span>';
   return h;
 }
@@ -375,7 +391,7 @@ async function load(quiet) {
 // Rangfolge pro Tag & Kategorie: Prio vor normal, dann genehmigt vor offen, dann wer zuerst eingetragen hat
 function rank(a, b) {
   return (b.is_prio - a.is_prio)
-    || ((b.status === 'genehmigt') - (a.status === 'genehmigt'))
+    || ({ genehmigt: 2, bestaetigt: 1 }[b.status] || 0) - ({ genehmigt: 2, bestaetigt: 1 }[a.status] || 0)
     || a.created_at.localeCompare(b.created_at);
 }
 
@@ -420,7 +436,7 @@ function render(quiet) {
   $('meBtn').classList.toggle('hidden', !me);
   $('nav').classList.toggle('hidden', !me);
   if (me) $('meBtn').innerHTML = `${avatar(me)}<span>${esc(me.name.split(' ')[0])}</span>`;
-  const open = S.requests.filter(r => r.status === 'offen').length;
+  const open = S.requests.filter(pending).length;
   $('adminBadge').textContent = open; $('adminBadge').classList.toggle('hidden', !open || !S.pin);
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === S.tab));
   if (!me && S.tab !== 'admin' && !S.blockMode) { closeSheet(); $('main').innerHTML = renderWho(); return; }
@@ -542,7 +558,7 @@ function renderAdmin() {
   if (!S.pin) return `<h2>Admin</h2><div class="card"><label class="f">Admin-PIN</label>
     <input type="password" inputmode="numeric" id="pinIn" autocomplete="off">
     <div class="actions"><button class="btn primary block" data-action="login">Anmelden</button></div></div>`;
-  const nOpen = S.requests.filter(r => r.status === 'offen').length, view = S.adminView || 'freigaben';
+  const nOpen = S.requests.filter(pending).length, view = S.adminView || 'freigaben';
   const nav = `<div class="seg">${[['freigaben', `Freigaben${nOpen ? ` (${nOpen})` : ''}`], ['planner', 'Planer'], ['settings', 'Einstellungen']].map(([v, l]) =>
     `<button class="${view === v ? 'on' : ''}" data-action="adminView" data-v="${v}">${l}</button>`).join('')}</div>`;
   if (view === 'planner') return nav + renderPlanner();
@@ -552,12 +568,17 @@ function renderAdmin() {
 
 // Freigaben gruppiert nach Mitarbeiter (alphabetisch), Einträge nach Datum
 function renderApprovals() {
+  // offen = Teamleitung bestätigt, final = Verkaufsleitung genehmigt, bearbeitet = erledigt ab heute
   const f = S.apprFilter || 'offen';
-  const list = S.requests.filter(r => f === 'offen' ? r.status === 'offen' : r.status !== 'offen' && r.end_date >= today());
-  const nOpen = S.requests.filter(r => r.status === 'offen').length;
-  let h = `<div class="chips" style="margin:10px 0 4px">${[['offen', `Offen (${nOpen})`], ['bearbeitet', 'Bearbeitet']].map(([k, l]) =>
-    `<button class="chip ${f === k ? 'on' : ''}" data-action="apprFilter" data-f="${k}">${l}</button>`).join('')}</div>`;
-  if (!list.length) return h + `<div class="card empty" style="margin-top:12px">${f === 'offen' ? 'Alles erledigt 👍' : 'Keine bearbeiteten Einträge ab heute.'}</div>`;
+  const match = { offen: r => r.status === 'offen', final: r => r.status === 'bestaetigt',
+    bearbeitet: r => !pending(r) && r.end_date >= today() };
+  const list = S.requests.filter(match[f]);
+  const n = k => S.requests.filter(match[k]).length;
+  let h = `<div class="chips" style="margin:10px 0 4px">${[['offen', `1 · Teamleitung (${n('offen')})`], ['final', `2 · Verkaufsleitung (${n('final')})`], ['bearbeitet', 'Bearbeitet']].map(([k, l]) =>
+    `<button class="chip ${f === k ? 'on' : ''}" data-action="apprFilter" data-f="${k}">${l}</button>`).join('')}</div>
+    <p class="small muted" style="margin:6px 4px 0">${f === 'offen' ? 'Neue Einträge prüfen. Ferien gehen danach zur Verkaufsleitung, WK und Prüfung sind damit final.'
+      : f === 'final' ? 'Von der Teamleitung bestätigte Ferien final genehmigen.' : 'Genehmigte und abgelehnte Einträge ab heute.'}</p>`;
+  if (!list.length) return h + `<div class="card empty" style="margin-top:12px">${f === 'bearbeitet' ? 'Keine bearbeiteten Einträge ab heute.' : 'Alles erledigt 👍'}</div>`;
   const groups = new Map();
   for (const r of list) { if (!groups.has(r.employee_id)) groups.set(r.employee_id, []); groups.get(r.employee_id).push(r); }
   const ids = [...groups.keys()].filter(emp).sort((a, b) => emp(a).name.localeCompare(emp(b).name, 'de'));
@@ -568,7 +589,7 @@ function renderApprovals() {
       return `<div class="bal" style="${b.left < 0 ? 'color:var(--danger);font-weight:600' : ''}">Guthaben ${y}: ${b.left < 0 ? `überzogen um ${fmtD(-b.left)}` : `${fmtD(b.left)} übrig`} von ${fmtD(b.total)} <span class="muted">(inkl. offene)</span></div>`; }).join('');
     h += `<div class="card" style="margin-top:12px"><div class="item">${avatar(e)}<div class="body">
         <div class="title">${esc(e.name)} <span class="small muted">${e.category}${e.hourly ? ' · Stundenlohn' : e.pensum < 100 ? ` · ${e.pensum} %` : ''}</span></div>${bal}</div>
-        ${f === 'offen' && rs.length > 1 ? `<button class="btn sm ok" style="flex:none" data-action="approveAll" data-id="${id}">Alle ${rs.length} ✓</button>` : ''}</div>
+        ${f !== 'bearbeitet' && rs.length > 1 ? `<button class="btn sm ok" style="flex:none" data-action="approveAll" data-id="${id}">Alle ${rs.length} ✓</button>` : ''}</div>
       ${rs.map(apprRow).join('')}</div>`;
   }
   return h;
@@ -582,10 +603,7 @@ function apprRow(r) {
     ${c ? `<div class="conf">⚠️ Limit an ${c.days} Tag${c.days > 1 ? 'en' : ''} überschritten – Vorrang: ${ahead}</div>` : ''}
     ${r.note ? `<div class="small" style="margin-top:4px">💬 ${esc(r.note)}</div>` : ''}
     <div class="actions">
-      ${r.status !== 'genehmigt' ? `<button class="btn sm ok" data-action="status" data-s="genehmigt" data-id="${r.id}">Genehmigen</button>` : ''}
-      ${r.status !== 'abgelehnt' ? `<button class="btn sm danger" data-action="status" data-s="abgelehnt" data-id="${r.id}">Ablehnen</button>` : ''}
-      ${r.status !== 'offen' ? `<button class="btn sm" data-action="status" data-s="offen" data-id="${r.id}">Auf offen</button>` : ''}
-      ${r.status !== 'offen' ? `<button class="btn sm" data-action="adminDel" data-id="${r.id}">Löschen</button>` : ''}
+      ${statusButtons(r, !pending(r))}
     </div></div>`;
 }
 
@@ -599,10 +617,7 @@ function adminCard(r) {
       ${r.note ? `<div class="small" style="margin-top:4px">${esc(r.note)}</div>` : ''}</div></div>
       ${conflictText(r)}
       <div class="actions">
-        ${r.status !== 'genehmigt' ? `<button class="btn sm ok" data-action="status" data-s="genehmigt" data-id="${r.id}">Genehmigen</button>` : ''}
-        ${r.status !== 'abgelehnt' ? `<button class="btn sm danger" data-action="status" data-s="abgelehnt" data-id="${r.id}">Ablehnen</button>` : ''}
-        ${r.status !== 'offen' ? `<button class="btn sm" data-action="status" data-s="offen" data-id="${r.id}">Auf offen</button>` : ''}
-        <button class="btn sm" data-action="adminDel" data-id="${r.id}">Löschen</button>
+        ${statusButtons(r, true)}
       </div></div>`;
 }
 
@@ -675,7 +690,7 @@ function renderPlanner(admin = true) {
   h += `<div class="pl-wrap">${yearMode ? plYear(y, admin) : plMonth(admin)}</div>`;
   h += `<div class="pl-legend">
     <span><i style="background:var(--clinic)"></i>Clinic</span><span><i style="background:var(--verkauf)"></i>Verkauf</span>
-    <span><i style="background:var(--verkauf);opacity:.4"></i>offen</span><span><i style="background:var(--verkauf);box-shadow:inset 0 -3px 0 #5b3cc4"></i>Prio</span><span><i style="background:var(--pruef)"></i>Prüfung (Std.)</span><span><i style="background:var(--mil)"></i>WK</span>
+    <span><i style="background:var(--verkauf);opacity:.4"></i>offen</span><span><i style="background:var(--verkauf);opacity:.7"></i>bestätigt</span><span><i style="background:var(--verkauf);box-shadow:inset 0 -3px 0 #5b3cc4"></i>Prio</span><span><i style="background:var(--pruef)"></i>Prüfung (Std.)</span><span><i style="background:var(--mil)"></i>WK</span>
     <span><i style="background:var(--holCHbg);border:1px solid var(--holCH)"></i>Feiertag CH</span><span><i style="background:var(--holZHbg);border:1px solid var(--holZH)"></i>Feiertag ZH</span>
     <span><i style="background:repeating-linear-gradient(135deg,var(--card) 0 3px,var(--blk) 3px 6px);border:1px solid var(--line)"></i>Sperrtag</span>
     <span><b style="color:var(--danger)">2</b>&nbsp;= mehr weg als erlaubt</span>
@@ -816,7 +831,7 @@ function renderBlockSheet() {
       <div><label class="f">Grund (optional)</label><input type="text" id="bReason" placeholder="z.B. Inventur" maxlength="100" value="${esc(reason)}"></div>
     </div>
     ${hit.length ? `<div class="warn">⚠️ ${hit.length} bestehende${hit.length > 1 ? '' : 'r'} Wunsch${hit.length > 1 ? 'e' : ''} in diesem Zeitraum (bleib${hit.length > 1 ? 'en' : 't'} bestehen, ggf. ablehnen):<br>
-      ${hit.map(r => `${esc(emp(r.employee_id)?.name)} – ${fmtRange(r.start_date, r.end_date)} (${r.status})`).join('<br>')}</div>` : ''}
+      ${hit.map(r => `${esc(emp(r.employee_id)?.name)} – ${fmtRange(r.start_date, r.end_date)} (${STATUS[r.status]})`).join('<br>')}</div>` : ''}
     <div class="actions"><button class="btn primary block" data-action="saveBlock">Sperren</button></div>`;
 }
 
@@ -896,14 +911,15 @@ document.addEventListener('click', async ev => {
     case 'adminView': S.adminView = t.dataset.v; closeSheet(); render(); window.scrollTo(0, 0); break;
     case 'apprFilter': S.apprFilter = t.dataset.f; render(); break;
     case 'approveAll': {
-      const rs = S.requests.filter(r => r.employee_id === id && r.status === 'offen');
-      const nConf = rs.filter(r => S.conflicts.has(r.id)).length;
-      if (!confirm(`Alle ${rs.length} offenen Einträge von ${emp(id).name} genehmigen?${nConf ? `\n\nAchtung: ${nConf} davon überschreiten das Limit.` : ''}`)) break;
+      const step = (S.apprFilter || 'offen') === 'final' ? 'bestaetigt' : 'offen';
+      const rs = S.requests.filter(r => r.employee_id === id && r.status === step);
+      const nConf = rs.filter(r => S.conflicts.has(r.id)).length, verb = step === 'offen' ? 'bestätigen' : 'final genehmigen';
+      if (!confirm(`Alle ${rs.length} Einträge von ${emp(id).name} ${verb}?${nConf ? `\n\nAchtung: ${nConf} davon überschreiten das Limit.` : ''}`)) break;
       for (const r of rs) {
-        const { error } = await db.rpc('admin_set_status', { p_pin: S.pin, p_id: r.id, p_status: 'genehmigt' });
+        const { error } = await db.rpc('admin_set_status', { p_pin: S.pin, p_id: r.id, p_status: nextStep(r)[0] });
         if (error) { await load(); return toast('Fehler: ' + error.message); }
       }
-      await load(); toast(`${rs.length} Einträge genehmigt ✓`); break; }
+      await load(); toast(`${rs.length} Einträge ${step === 'offen' ? 'bestätigt' : 'genehmigt'} ✓`); break; }
     case 'plView': S.plView = t.dataset.v; if (S.plView === 'Jahr') S.plYear = S.month.getFullYear(); else if (S.plYear) S.month = new Date(S.plYear, S.plYear === new Date().getFullYear() ? new Date().getMonth() : 0, 1); render(); break;
     case 'plPrev': case 'plNext': {
       const dir = a === 'plNext' ? 1 : -1;
