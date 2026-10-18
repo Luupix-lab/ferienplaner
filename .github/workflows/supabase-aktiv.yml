@@ -1,0 +1,55 @@
+# Hält die Supabase-Gratisprojekte aller Teams aktiv (Supabase pausiert nach 7 Tagen ohne Aktivität).
+# Läuft in der GitHub-Cloud, unabhängig vom Mac. Liest URL und Publishable Key aus jeder config.js.
+name: Supabase aktiv halten
+
+on:
+  schedule:
+    - cron: '17 6 * * 1,4'   # Montag + Donnerstag, 06:17 UTC (≈ 07:17/08:17 Schweizer Zeit)
+  workflow_dispatch:          # manuell startbar unter "Actions"
+
+permissions:
+  contents: write
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Datenbanken aller Teams abfragen
+        run: |
+          fail=0
+          for cfg in config.js */config.js; do
+            url=$(sed -n "s/.*supabaseUrl: *'\([^']*\)'.*/\1/p" "$cfg")
+            key=$(sed -n "s/.*supabaseKey: *'\([^']*\)'.*/\1/p" "$cfg")
+            team=$(sed -n "s/.*title: *'\([^']*\)'.*/\1/p" "$cfg")
+            code=000
+            for try in 1 2 3; do
+              code=$(curl -s -m 30 -o /dev/null -w '%{http_code}' "$url/rest/v1/category_limits?select=category" -H "apikey: $key")
+              [ "$code" = 200 ] && break
+              sleep 60
+            done
+            if [ "$code" = 200 ]; then
+              echo "✅ $team: aktiv (HTTP 200)"
+            else
+              echo "::error::$team antwortet nicht (HTTP $code) – wahrscheinlich pausiert. Im Supabase-Dashboard beim Projekt auf 'Restore' klicken: https://supabase.com/dashboard"
+              fail=1
+            fi
+          done
+          exit $fail
+
+      # GitHub pausiert geplante Abläufe nach 60 Tagen ohne Repo-Änderung → alle 30 Tage ein Zeitstempel
+      - name: Repo aktiv halten (monatlich)
+        if: github.event_name == 'schedule'
+        run: |
+          last=$(cat .github/keepalive 2>/dev/null || echo 1970-01-01)
+          if [ $(( ( $(date +%s) - $(date -d "$last" +%s) ) / 86400 )) -ge 30 ]; then
+            date -u +%F > .github/keepalive
+            git config user.name "github-actions[bot]"
+            git config user.email "41898798+github-actions[bot]@users.noreply.github.com"
+            git add .github/keepalive
+            git commit -m "Keepalive: Repo aktiv halten"
+            git push
+          else
+            echo "Letzter Zeitstempel $last – noch nicht nötig."
+          fi
